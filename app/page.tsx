@@ -3,15 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Search, Star, Film, Tv, Loader2, Bookmark,
-  ChevronLeft, Flame, X, Home, LayoutGrid,
+  ChevronLeft, Flame, X, Home, LayoutGrid, Sparkles,
 } from "lucide-react";
 import { GENRES_MOVIE, GENRES_TV, MediaItem, MediaType, tmdb } from "@/lib/tmdb";
+import { AnimeItem, fetchRecentAnime, searchAnime } from "@/lib/anime";
 import { PosterCard, SkeletonCard } from "@/components/ui";
+import { AnimeCard, AnimeSkeletonCard } from "@/components/AnimeCard";
+import { AnimeModal } from "@/components/AnimeModal";
 import { HeroCarousel } from "@/components/Hero";
 import { Row, TrendingRow } from "@/components/Row";
 import { DetailsModal } from "@/components/Player";
 
-type Page = "home" | "categories" | "favorites";
+type Page = "home" | "animes" | "categories" | "favorites";
 
 export default function CimaxPage() {
   /* ── بيانات الرئيسية ── */
@@ -32,18 +35,38 @@ export default function CimaxPage() {
 
   /* ── واجهة ── */
   const [selected, setSelected] = useState<{ item: MediaItem; type: MediaType } | null>(null);
+  const [selectedAnime, setSelectedAnime] = useState<AnimeItem | null>(null);
   const [page,     setPage]     = useState<Page>("home");
+
+  /* ── أنيمي ── */
+  const [animeList,    setAnimeList]    = useState<AnimeItem[]>([]);
+  const [animeLoading, setAnimeLoading] = useState(false);
+  const [animePage,    setAnimePage]    = useState(1);
+  const [animeTotal,   setAnimeTotal]   = useState(1);
+  const [animeResults, setAnimeResults] = useState<AnimeItem[] | null>(null);
+  const [animeSearching, setAnimeSearching] = useState(false);
 
   /* ── مفضلة ── */
   const [favorites, setFavorites] = useState<Map<string, MediaItem>>(new Map());
+  const [animeFavorites, setAnimeFavorites] = useState<Map<number, AnimeItem>>(new Map());
   const favSet  = new Set(favorites.keys());
+  const animeFavSet = new Set(Array.from(animeFavorites.keys()).map(id => `anime-${id}`));
   const favList = Array.from(favorites.values());
+  const animeFavList = Array.from(animeFavorites.values());
 
   const toggleFav = useCallback((item: MediaItem, type: MediaType) => {
     setFavorites(prev => {
       const next = new Map(prev);
       const key = `${type}-${item.id}`;
       next.has(key) ? next.delete(key) : next.set(key, { ...item, media_type: type });
+      return next;
+    });
+  }, []);
+
+  const toggleAnimeFav = useCallback((item: AnimeItem) => {
+    setAnimeFavorites(prev => {
+      const next = new Map(prev);
+      next.has(item.mal_id) ? next.delete(item.mal_id) : next.set(item.mal_id, item);
       return next;
     });
   }, []);
@@ -88,7 +111,19 @@ export default function CimaxPage() {
 
   /* بحث مع تأخير 450ms */
   useEffect(() => {
-    if (!query.trim()) { setResults(null); return; }
+    if (!query.trim()) { setResults(null); setAnimeResults(null); return; }
+
+    if (page === "animes") {
+      setAnimeSearching(true);
+      const t = setTimeout(async () => {
+        try {
+          setAnimeResults(await searchAnime(query));
+        } catch { setAnimeResults([]); }
+        finally { setAnimeSearching(false); }
+      }, 450);
+      return () => clearTimeout(t);
+    }
+
     setSearching(true);
     const t = setTimeout(async () => {
       try {
@@ -102,7 +137,30 @@ export default function CimaxPage() {
       finally   { setSearching(false); }
     }, 450);
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, page]);
+
+  /* تحميل صفحة الأنيمي */
+  useEffect(() => {
+    if (page !== "animes") return;
+    setAnimeLoading(true);
+    setAnimePage(1);
+    fetchRecentAnime(1, 24)
+      .then(d => { setAnimeList(d.items); setAnimeTotal(d.totalPages); })
+      .catch(() => setAnimeList([]))
+      .finally(() => setAnimeLoading(false));
+  }, [page]);
+
+  const loadMoreAnime = async () => {
+    if (animePage >= animeTotal) return;
+    setAnimeLoading(true);
+    const next = animePage + 1;
+    try {
+      const d = await fetchRecentAnime(next, 24);
+      setAnimeList(prev => [...prev, ...d.items]);
+      setAnimePage(next);
+    } catch {}
+    setAnimeLoading(false);
+  };
 
   /* تحميل صفحة الفئات */
   useEffect(() => {
@@ -159,7 +217,7 @@ export default function CimaxPage() {
             <input
               value={query}
               onChange={e => { setQuery(e.target.value); if (e.target.value) setPage("home"); }}
-              placeholder="ابحث عن فيلم أو مسلسل..."
+              placeholder={page === "animes" ? "ابحث عن أنيمي..." : "ابحث عن فيلم أو مسلسل..."}
               className="w-full rounded-full bg-zinc-900 border border-white/5
                 py-2.5 pr-9 pl-4 text-sm placeholder:text-zinc-500
                 focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition"
@@ -174,17 +232,22 @@ export default function CimaxPage() {
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1 flex-shrink-0">
-            {(["home", "categories", "favorites"] as Page[]).map(p => {
-              const labels: Record<Page, string> = { home: "الرئيسية", categories: "الفئات", favorites: "المفضلة" };
+            {(["home", "animes", "categories", "favorites"] as Page[]).map(p => {
+              const labels: Record<Page, string> = {
+                home: "الرئيسية", animes: "أنيمي", categories: "الفئات", favorites: "المفضلة",
+              };
               return (
-                <button key={p} onClick={() => setPage(p)}
-                  className={`rounded-lg px-3.5 py-2 text-sm font-bold transition
-                    ${page === p ? "bg-blue-500/15 text-blue-300" : "text-zinc-400 hover:text-white"}`}>
+                <button key={p} onClick={() => { setPage(p); if (p !== "animes") setQuery(""); }}
+                  className={`flex items-center gap-1 rounded-lg px-3.5 py-2 text-sm font-bold transition
+                    ${page === p
+                      ? p === "animes" ? "bg-violet-500/15 text-violet-300" : "bg-blue-500/15 text-blue-300"
+                      : "text-zinc-400 hover:text-white"}`}>
+                  {p === "animes" && <Sparkles size={14} />}
                   {labels[p]}
-                  {p === "favorites" && favList.length > 0 && (
+                  {p === "favorites" && (favList.length + animeFavList.length) > 0 && (
                     <span className="mr-1.5 inline-flex h-4 min-w-4 items-center justify-center
                       rounded-full bg-blue-500 px-1 text-[10px] text-white">
-                      {favList.length}
+                      {favList.length + animeFavList.length}
                     </span>
                   )}
                 </button>
@@ -207,9 +270,26 @@ export default function CimaxPage() {
       {query.trim() ? (
         <div className="mx-auto max-w-7xl px-4 md:px-8 py-6 min-h-[60vh]">
           <p className="mb-4 text-sm font-bold text-zinc-400">
-            {searching ? "جاري البحث…" : `نتائج البحث عن "${query}"`}
+            {(page === "animes" ? animeSearching : searching)
+              ? "جاري البحث…"
+              : `نتائج البحث عن "${query}"`}
           </p>
-          {searching ? (
+          {page === "animes" ? (
+            animeSearching ? (
+              <div className="flex justify-center py-20">
+                <Loader2 className="animate-spin text-violet-400" size={28} />
+              </div>
+            ) : animeResults?.length === 0 ? (
+              <div className="py-20 text-center text-zinc-500">لا توجد نتائج أنيمي</div>
+            ) : (
+              <div className="grid grid-cols-3 md:grid-cols-6 gap-2.5">
+                {animeResults?.map(a => (
+                  <AnimeCard key={`anime-${a.mal_id}`} item={a}
+                    onSelect={setSelectedAnime} favSet={animeFavSet} toggleFav={toggleAnimeFav} />
+                ))}
+              </div>
+            )
+          ) : searching ? (
             <div className="flex justify-center py-20">
               <Loader2 className="animate-spin text-blue-400" size={28} />
             </div>
@@ -245,6 +325,45 @@ export default function CimaxPage() {
             <Row title="أفلام شائعة"            icon={<Film size={16}/>} items={popularMovies} type="movie" onSelect={select} loading={loading} favSet={favSet} toggleFav={toggleFav} />
           </main>
         </>
+
+      /* ══════════════════ الأنيمي ══════════════════ */
+      ) : page === "animes" ? (
+        <div className="mx-auto max-w-7xl px-4 md:px-8 py-6 min-h-[60vh]">
+          <div className="mb-6 flex items-center gap-2">
+            <Sparkles size={20} className="text-violet-400" />
+            <div>
+              <h2 className="text-xl font-extrabold text-white">أنيمي</h2>
+              <p className="text-xs text-zinc-500">مشغّل MegaPlay — مترجم ومدبلج</p>
+            </div>
+          </div>
+
+          {animeLoading && !animeList.length ? (
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-2.5">
+              {Array.from({ length: 12 }).map((_, i) => <AnimeSkeletonCard key={i} />)}
+            </div>
+          ) : animeList.length === 0 ? (
+            <div className="py-20 text-center text-zinc-500">لا يوجد أنيمي متاح حالياً</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 md:grid-cols-6 gap-2.5">
+                {animeList.map(a => (
+                  <AnimeCard key={`anime-${a.mal_id}`} item={a}
+                    onSelect={setSelectedAnime} favSet={animeFavSet} toggleFav={toggleAnimeFav} />
+                ))}
+              </div>
+              {animePage < animeTotal && (
+                <button onClick={loadMoreAnime} disabled={animeLoading}
+                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl
+                    bg-zinc-900 py-3 text-sm font-bold text-zinc-300
+                    ring-1 ring-white/10 hover:ring-violet-400/40 hover:text-violet-300
+                    transition disabled:opacity-50">
+                  {animeLoading ? <Loader2 className="animate-spin" size={16}/> : <ChevronLeft size={16}/>}
+                  تحميل المزيد
+                </button>
+              )}
+            </>
+          )}
+        </div>
 
       /* ══════════════════ الفئات ══════════════════ */
       ) : page === "categories" ? (
@@ -309,20 +428,38 @@ export default function CimaxPage() {
         <div className="mx-auto max-w-7xl px-4 md:px-8 py-6 min-h-[60vh]">
           <h2 className="mb-1 text-xl font-extrabold text-white">مكتبتي</h2>
           <p className="mb-5 text-sm text-zinc-500">محتواك المحفوظ</p>
-          {!favList.length ? (
+          {!favList.length && !animeFavList.length ? (
             <div className="flex flex-col items-center gap-3 py-24 text-center text-zinc-500">
               <Bookmark size={46} className="text-blue-400/50" />
               <p className="font-bold text-zinc-300">لا توجد عناصر محفوظة بعد</p>
               <p className="text-xs">اضغط على أيقونة العلامة على أي بطاقة لحفظها هنا</p>
             </div>
           ) : (
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-2.5">
-              {favList.map(item => (
-                <PosterCard key={`${item.media_type}-${item.id}`}
-                  item={item} type={(item.media_type as MediaType) || "movie"}
-                  onSelect={select} favSet={favSet} toggleFav={toggleFav} />
-              ))}
-            </div>
+            <>
+              {animeFavList.length > 0 && (
+                <>
+                  <h3 className="mb-3 text-sm font-bold text-violet-400">أنيمي ({animeFavList.length})</h3>
+                  <div className="mb-8 grid grid-cols-3 md:grid-cols-6 gap-2.5">
+                    {animeFavList.map(item => (
+                      <AnimeCard key={`fav-anime-${item.mal_id}`} item={item}
+                        onSelect={setSelectedAnime} favSet={animeFavSet} toggleFav={toggleAnimeFav} />
+                    ))}
+                  </div>
+                </>
+              )}
+              {favList.length > 0 && (
+                <>
+                  <h3 className="mb-3 text-sm font-bold text-blue-400">أفلام ومسلسلات ({favList.length})</h3>
+                  <div className="grid grid-cols-3 md:grid-cols-6 gap-2.5">
+                    {favList.map(item => (
+                      <PosterCard key={`${item.media_type}-${item.id}`}
+                        item={item} type={(item.media_type as MediaType) || "movie"}
+                        onSelect={select} favSet={favSet} toggleFav={toggleFav} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
           )}
         </div>
       )}
@@ -336,23 +473,33 @@ export default function CimaxPage() {
         />
       )}
 
+      {selectedAnime && (
+        <AnimeModal
+          item={selectedAnime}
+          onClose={() => setSelectedAnime(null)}
+          favSet={animeFavSet}
+          toggleFav={toggleAnimeFav}
+        />
+      )}
+
       {/* ── شريط التنقل السفلي (موبايل) ── */}
       <nav className="fixed bottom-0 inset-x-0 z-30 flex justify-around
         border-t border-white/5 bg-zinc-950/90 backdrop-blur-md md:hidden">
         {([
           { id: "home"       as Page, label: "الرئيسية", Icon: Home        },
+          { id: "animes"     as Page, label: "أنيمي",    Icon: Sparkles    },
           { id: "categories" as Page, label: "الفئات",   Icon: LayoutGrid  },
           { id: "favorites"  as Page, label: "المفضلة",  Icon: Bookmark    },
         ] as { id: Page; label: string; Icon: any }[]).map(({ id, label, Icon }) => (
-          <button key={id} onClick={() => setPage(id)}
-            className={`relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] font-bold transition
-              ${page === id ? "text-blue-400" : "text-zinc-500"}`}>
+          <button key={id} onClick={() => { setPage(id); if (id !== "animes") setQuery(""); }}
+            className={`relative flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] font-bold transition
+              ${page === id ? (id === "animes" ? "text-violet-400" : "text-blue-400") : "text-zinc-500"}`}>
             <Icon size={19} />
             {label}
-            {id === "favorites" && favList.length > 0 && (
+            {id === "favorites" && (favList.length + animeFavList.length) > 0 && (
               <span className="absolute top-1 right-[28%] flex h-4 min-w-4 items-center justify-center
                 rounded-full bg-blue-500 px-1 text-[9px] text-white">
-                {favList.length}
+                {favList.length + animeFavList.length}
               </span>
             )}
           </button>
@@ -360,7 +507,7 @@ export default function CimaxPage() {
       </nav>
 
       <footer className="hidden md:block border-t border-white/5 py-5 text-center text-xs text-zinc-500">
-        البيانات من TMDB · لأغراض العرض فقط
+        البيانات من TMDB و Anikoto · لأغراض العرض فقط
       </footer>
     </div>
   );
