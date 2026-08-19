@@ -11,6 +11,9 @@ import { FavBtn, Rating } from "./ui";
 /* ═══════════════════════════════════════
    مشغّل iframe مع أزرار السيرفرات
 ═══════════════════════════════════════ */
+const IFRAME_ALLOW =
+  "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen";
+
 export function VideoPlayer({
   item, type, season, episode,
 }: {
@@ -21,54 +24,76 @@ export function VideoPlayer({
   const [loading, setLoading]       = useState(true);
 
   const url = buildEmbedUrl(server, type, item.id, season, episode);
+  const serverName = SERVERS.find(s => s.id === server)?.name;
 
   /* إعادة تحميل عند تغيير السيرفر أو الحلقة */
   useEffect(() => {
     setLoading(true);
     setIframeKey(k => k + 1);
+    const t = setTimeout(() => setLoading(false), 4000);
+    return () => clearTimeout(t);
   }, [server, season, episode]);
 
   return (
     <div className="space-y-3">
-      {/* iframe */}
-      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
+      {/* iframe — no sandbox: required for VidKing stream APIs & controls */}
+      <div
+        className="relative w-full overflow-hidden rounded-xl bg-black ring-1 ring-white/10"
+        style={{ height: "min(70vh, 720px)" }}
+      >
         {loading && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-zinc-950">
+          <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-zinc-950">
             <Loader2 className="animate-spin text-blue-400" size={32} />
             <span className="text-xs text-zinc-500">
-              جاري تحميل المشغّل من {SERVERS.find(s => s.id === server)?.name}…
+              جاري تحميل المشغّل من {serverName}…
             </span>
           </div>
         )}
         <iframe
           key={iframeKey}
           src={url}
-          className="h-full w-full border-0"
-          allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+          title={`${serverName} — ${item.title || item.name || "مشغّل"}`}
+          className="absolute inset-0 h-full w-full border-0"
+          allow={IFRAME_ALLOW}
           allowFullScreen
-          referrerPolicy="no-referrer-when-downgrade"
-          sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
           onLoad={() => setLoading(false)}
         />
       </div>
 
+      {server === "vidking" && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex text-[11px] font-semibold text-zinc-500 hover:text-blue-400 transition"
+        >
+          فتح VidKing في نافذة جديدة إذا لم يستجب المشغّل
+        </a>
+      )}
+
       {/* servers row */}
-      <div className="flex flex-wrap gap-2">
-        {SERVERS.map(s => (
-          <button key={s.id} onClick={() => setServer(s.id)}
-            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-bold transition
-              ${server === s.id
-                ? "bg-blue-600 border-blue-600 text-white"
-                : "bg-zinc-900 border-white/10 text-zinc-300 hover:border-blue-400/40"}`}>
-            {s.ar && (
-              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-[3px]
-                bg-emerald-500/20 ring-1 ring-emerald-400/50 text-[8px] font-extrabold text-emerald-400">
-                AR
-              </span>
-            )}
-            {s.name}
-          </button>
-        ))}
+      <div className="space-y-1.5">
+        <p className="text-[11px] font-semibold text-zinc-500">
+          {SERVERS.length} سيرفر متاح — اختر بديلاً إذا لم يعمل المشغّل
+        </p>
+        <div className="flex gap-2 overflow-x-auto pb-1
+          [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1">
+          {SERVERS.map(s => (
+            <button key={s.id} onClick={() => setServer(s.id)}
+              className={`flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-bold transition
+                ${server === s.id
+                  ? "bg-blue-600 border-blue-600 text-white"
+                  : "bg-zinc-900 border-white/10 text-zinc-300 hover:border-blue-400/40"}`}>
+              {s.ar && (
+                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-[3px]
+                  bg-emerald-500/20 ring-1 ring-emerald-400/50 text-[8px] font-extrabold text-emerald-400">
+                  AR
+                </span>
+              )}
+              {s.name}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -127,9 +152,9 @@ export function DetailsModal({
       onClick={onClose}
     >
       <div
-        className="relative w-full md:max-w-4xl max-h-[94vh] overflow-y-auto
-          rounded-t-2xl md:rounded-2xl bg-zinc-950 ring-1 ring-white/10
-          [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1"
+        className={`relative w-full md:max-w-4xl max-h-[94vh] rounded-t-2xl md:rounded-2xl bg-zinc-950 ring-1 ring-white/10
+          [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1
+          ${showPlayer ? "overflow-hidden" : "overflow-y-auto"}`}
         onClick={e => e.stopPropagation()}
       >
         {/* ─── وضع التفاصيل ─── */}

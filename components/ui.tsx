@@ -46,9 +46,17 @@ export function PosterCard({
   const isFav = favSet.has(`${type}-${item.id}`);
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onSelect(item, type)}
-      className="group relative flex-shrink-0 w-full text-right rounded-xl overflow-hidden
+      onKeyDown={e => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(item, type);
+        }
+      }}
+      className="group relative flex-shrink-0 w-full cursor-pointer text-right rounded-xl overflow-hidden
         bg-zinc-900 ring-1 ring-white/5 transition-all duration-300
         hover:ring-blue-400/40 hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-500/10"
     >
@@ -90,7 +98,7 @@ export function PosterCard({
           </p>
         </div>
       </div>
-    </button>
+    </div>
   );
 }
 
