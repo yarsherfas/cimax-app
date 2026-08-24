@@ -7,9 +7,7 @@ import {
   fetchAnimeByMal, fetchAnimeSeries,
 } from "@/lib/anime";
 import { FavBtn } from "./ui";
-
-const IFRAME_ALLOW =
-  "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen";
+import { EmbedPlayer } from "./EmbedPlayer";
 
 function AnimeVideoPlayer({
   item, episode, episodes, episodeCount,
@@ -20,8 +18,7 @@ function AnimeVideoPlayer({
   episodeCount: number;
 }) {
   const [lang, setLang] = useState<AnimeLang>("sub");
-  const [iframeKey, setIframeKey] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const epData = episodes.find(e => e.number === episode);
   const embedId = epData?.embed_id;
@@ -35,10 +32,7 @@ function AnimeVideoPlayer({
   });
 
   useEffect(() => {
-    setLoading(true);
-    setIframeKey(k => k + 1);
-    const t = setTimeout(() => setLoading(false), 4000);
-    return () => clearTimeout(t);
+    setReloadKey(k => k + 1);
   }, [lang, episode, embedId]);
 
   useEffect(() => {
@@ -58,26 +52,12 @@ function AnimeVideoPlayer({
 
   return (
     <div className="space-y-3">
-      <div
-        className="relative w-full overflow-hidden rounded-xl bg-black ring-1 ring-white/10"
-        style={{ height: "min(70vh, 720px)" }}
-      >
-        {loading && (
-          <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-zinc-950">
-            <Loader2 className="animate-spin text-violet-400" size={32} />
-            <span className="text-xs text-zinc-500">جاري تحميل MegaPlay…</span>
-          </div>
-        )}
-        <iframe
-          key={iframeKey}
-          src={url}
-          title={`${item.title} — ح${episode}`}
-          className="absolute inset-0 h-full w-full border-0"
-          allow={IFRAME_ALLOW}
-          allowFullScreen
-          onLoad={() => setLoading(false)}
-        />
-      </div>
+      <EmbedPlayer
+        src={url}
+        title={`${item.title} — ح${episode}`}
+        reloadKey={`${reloadKey}-${lang}-${episode}`}
+        accent="violet"
+      />
 
       <a
         href={url}
@@ -93,8 +73,8 @@ function AnimeVideoPlayer({
           <button key={l.id} onClick={() => setLang(l.id)}
             className={`rounded-lg border px-4 py-1.5 text-[12px] font-bold transition
               ${lang === l.id
-                ? "bg-violet-600 border-violet-600 text-white"
-                : "bg-zinc-900 border-white/10 text-zinc-300 hover:border-violet-400/40"}`}>
+                ? "bg-white border-white text-black"
+                : "bg-[#15151a] border-white/10 text-zinc-300 hover:border-white/40 hover:text-white"}`}>
             {l.name}
           </button>
         ))}
@@ -177,15 +157,15 @@ export function AnimeModal({
               <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/60 to-transparent" />
               <button onClick={onClose}
                 className="absolute left-3 top-3 flex h-9 w-9 items-center justify-center
-                  rounded-full bg-black/60 text-white hover:bg-violet-500 transition">
+                  rounded-full bg-black/60 text-white hover:bg-white hover:text-black transition">
                 <X size={18} />
               </button>
               <button onClick={() => setShowPlayer(true)}
                 className="absolute inset-0 flex items-center justify-center group">
                 <span className="flex h-16 w-16 items-center justify-center rounded-full
-                  bg-violet-500/90 text-white shadow-2xl shadow-violet-500/40
+                  bg-white/95 text-black shadow-2xl shadow-black/50
                   group-hover:scale-110 transition-transform">
-                  <Play size={26} className="fill-white" />
+                  <Play size={26} className="fill-black" />
                 </span>
               </button>
             </div>
@@ -216,11 +196,11 @@ export function AnimeModal({
 
               <button
                 onClick={() => setShowPlayer(true)}
-                className="mt-5 flex items-center gap-2 rounded-xl bg-gradient-to-l
-                  from-violet-600 to-violet-500 px-6 py-3 text-sm font-extrabold text-white
-                  shadow-lg shadow-violet-500/30 hover:brightness-110 transition"
+                className="mt-5 flex items-center gap-2 rounded-full bg-white px-7 py-3
+                  text-sm font-extrabold text-black shadow-xl shadow-black/40
+                  hover:bg-zinc-200 transition"
               >
-                <Play size={16} className="fill-white" />
+                <Play size={16} className="fill-black" />
                 مشاهدة الحلقة 1
               </button>
 
@@ -237,13 +217,13 @@ export function AnimeModal({
                       <button key={ep.number}
                         onClick={() => { setEpisode(ep.number); setShowPlayer(true); }}
                         className={`flex w-full items-center gap-3 border-b border-white/5
-                          px-3 py-2.5 text-right transition hover:bg-violet-500/10
-                          ${episode === ep.number ? "bg-violet-500/10 border-r-2 border-r-violet-500" : ""}`}>
+                          px-3 py-2.5 text-right transition hover:bg-white/5
+                          ${episode === ep.number ? "bg-white/5 border-r-2 border-r-white" : ""}`}>
                         <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center
                           rounded-lg text-xs font-extrabold
                           ${episode === ep.number
-                            ? "bg-violet-500 text-white"
-                            : "bg-zinc-900 text-violet-300 ring-1 ring-white/10"}`}>
+                            ? "bg-white text-black"
+                            : "bg-[#1c1c22] text-zinc-300 ring-1 ring-white/10"}`}>
                           {ep.number}
                         </span>
                         <div className="flex-1 min-w-0">
@@ -296,8 +276,8 @@ export function AnimeModal({
               <button
                 disabled={episode >= episodeCount}
                 onClick={() => setEpisode(e => e + 1)}
-                className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold text-white
-                  disabled:opacity-30 hover:brightness-110 transition">
+                className="rounded-full bg-white px-4 py-1.5 text-xs font-bold text-black
+                  disabled:opacity-30 hover:bg-zinc-200 transition">
                 التالية →
               </button>
             </div>

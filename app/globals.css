@@ -2,7 +2,7 @@
 
 html { scroll-behavior: smooth; }
 body {
-  background: #09090b;
+  background: #0a0a0c;
   color: #f4f4f5;
   -webkit-font-smoothing: antialiased;
 }
@@ -13,4 +13,17 @@ body {
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #2563eb; }
+::-webkit-scrollbar-thumb:hover { background: #71717a; }
+
+/* رقم ضخم بحدود — لصفوف «أفضل 10» */
+.top10-num {
+  font-weight: 900;
+  line-height: 0.78;
+  color: #0a0a0c;
+  -webkit-text-stroke: 3px #3c3c46;
+  letter-spacing: -0.05em;
+  user-select: none;
+}
+@media (max-width: 767px) {
+  .top10-num { -webkit-text-stroke-width: 2px; }
+}
