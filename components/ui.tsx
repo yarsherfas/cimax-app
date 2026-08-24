@@ -1,5 +1,5 @@
 "use client";
-import { Star, Bookmark, Film } from "lucide-react";
+import { Star, Bookmark, Film, Play } from "lucide-react";
 import { IMG, MediaItem, MediaType } from "@/lib/tmdb";
 
 /* ── Rating pill ── */
@@ -21,10 +21,10 @@ export function FavBtn({
     <button
       onClick={e => { e.stopPropagation(); onToggle(); }}
       style={{ width: size, height: size }}
-      className={`flex items-center justify-center rounded-lg backdrop-blur transition-all ring-1
+      className={`flex items-center justify-center rounded-full backdrop-blur transition-all ring-1
         ${active
-          ? "bg-blue-600/30 text-blue-300 ring-blue-400/50"
-          : "bg-black/55 text-zinc-200 ring-white/10 hover:text-blue-300"}`}
+          ? "bg-white text-black ring-white"
+          : "bg-black/55 text-zinc-200 ring-white/15 hover:text-white hover:ring-white/50"}`}
     >
       <Bookmark size={Math.round(size * 0.45)} className={active ? "fill-current" : ""} />
     </button>
@@ -57,10 +57,10 @@ export function PosterCard({
         }
       }}
       className="group relative flex-shrink-0 w-full cursor-pointer text-right rounded-xl overflow-hidden
-        bg-zinc-900 ring-1 ring-white/5 transition-all duration-300
-        hover:ring-blue-400/40 hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-500/10"
+        bg-[#15151a] ring-1 ring-white/10 transition-all duration-300
+        hover:ring-white/40 hover:shadow-2xl hover:shadow-black/60"
     >
-      <div className="relative aspect-[2/3] overflow-hidden bg-zinc-800">
+      <div className="relative aspect-[2/3] overflow-hidden bg-[#1c1c22]">
         {item.poster_path ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -86,8 +86,8 @@ export function PosterCard({
         </div>
         {/* play hover */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg shadow-blue-500/40">
-            ▶
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-black shadow-2xl shadow-black/50">
+            <Play size={18} className="fill-black" />
           </span>
         </div>
         {/* info bottom */}
@@ -104,5 +104,5 @@ export function PosterCard({
 
 /* ── Skeleton card ── */
 export function SkeletonCard() {
-  return <div className="flex-shrink-0 w-[140px] md:w-[170px] aspect-[2/3] rounded-xl bg-zinc-900 animate-pulse" />;
+  return <div className="flex-shrink-0 w-[140px] md:w-[170px] aspect-[2/3] rounded-xl bg-[#15151a] animate-pulse" />;
 }
