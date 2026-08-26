@@ -25,6 +25,13 @@ export async function tmdb(
 const VIDKING_PARAMS = "color=729C65&autoPlay=true";
 const VIDKING_TV_PARAMS = `${VIDKING_PARAMS}&nextEpisode=true`;
 
+/* cinejoy.to يرفض التضمين في iframe (X-Frame-Options: DENY)، لذا يمرَّر عبر
+   بروكسي يزيل الترويسات الحاجبة — راجع server/cinejoy-proxy.js.
+   في الإنتاج اضبط NEXT_PUBLIC_CINEJOY_PROXY على رابط البروكسي المنشور. */
+const CINEJOY_PROXY = (
+  process.env.NEXT_PUBLIC_CINEJOY_PROXY || "http://localhost:3001"
+).replace(/\/+$/, "");
+
 export function buildEmbedUrl(
   server: string,
   type: "movie" | "tv",
@@ -78,14 +85,14 @@ export function buildEmbedUrl(
       return m
         ? `https://vidnest.fun/movie/${id}`
         : `https://vidnest.fun/tv/${id}/${season}/${episode}`;
-    case "flixer":
-      return m
-        ? `https://flixer.su/watch/movie/${id}`
-        : `https://flixer.su/watch/tv/${id}/${season}/${episode}`;
     case "autoembed":
       return m
         ? `https://autoembed.co/movie/tmdb/${id}`
         : `https://autoembed.co/tv/tmdb/${id}-${season}-${episode}`;
+    case "cinejoy":
+      return m
+        ? `${CINEJOY_PROXY}/watch/movie/${id}`
+        : `${CINEJOY_PROXY}/watch/tv/${id}/${season}/${episode}`;
     case "multiembed":
     default:
       return m
@@ -112,9 +119,9 @@ export const SERVERS = [
   { id: "vidsrcme",   name: "VidSrc ME",  ar: false, blockPopups: false },
   { id: "vidsrcwiki", name: "VidSrc Wiki", ar: false, blockPopups: false },
   { id: "vidnest",    name: "VidNest",    ar: false, blockPopups: false },
-  { id: "flixer",     name: "Flixer",     ar: false, blockPopups: false },
   { id: "autoembed",  name: "AutoEmbed",  ar: false, blockPopups: false },
   { id: "multiembed", name: "MultiEmbed", ar: false, blockPopups: false },
+  { id: "cinejoy",    name: "CineJoy",    ar: false, blockPopups: false },
 ];
 
 export const GENRES_MOVIE: Record<number, string> = {
