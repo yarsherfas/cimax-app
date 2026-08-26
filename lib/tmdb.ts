@@ -25,13 +25,6 @@ export async function tmdb(
 const VIDKING_PARAMS = "color=729C65&autoPlay=true";
 const VIDKING_TV_PARAMS = `${VIDKING_PARAMS}&nextEpisode=true`;
 
-/* cinejoy.to يرفض التضمين في iframe (X-Frame-Options: DENY)، لذا يمرَّر عبر
-   بروكسي يزيل الترويسات الحاجبة — راجع server/cinejoy-proxy.js.
-   في الإنتاج اضبط NEXT_PUBLIC_CINEJOY_PROXY على رابط البروكسي المنشور. */
-const CINEJOY_PROXY = (
-  process.env.NEXT_PUBLIC_CINEJOY_PROXY || "http://localhost:3001"
-).replace(/\/+$/, "");
-
 export function buildEmbedUrl(
   server: string,
   type: "movie" | "tv",
@@ -90,9 +83,12 @@ export function buildEmbedUrl(
         ? `https://autoembed.co/movie/tmdb/${id}`
         : `https://autoembed.co/tv/tmdb/${id}-${season}-${episode}`;
     case "cinejoy":
+      /* الموقع يمنع التضمين المباشر (X-Frame-Options: DENY) وlocalhost محجوب
+         من الصفحات العامة، لذا يُخدَم عبر بروكسي بنفس أصل التطبيق:
+         proxy.ts يعيد كتابة /watch/* إلى app/api/cinejoy. */
       return m
-        ? `${CINEJOY_PROXY}/watch/movie/${id}`
-        : `${CINEJOY_PROXY}/watch/tv/${id}/${season}/${episode}`;
+        ? `/watch/movie/${id}`
+        : `/watch/tv/${id}/${season}/${episode}`;
     case "multiembed":
     default:
       return m
