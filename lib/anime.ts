@@ -127,3 +127,26 @@ export function buildEpisodeList(count: number, fromApi: AnimeEpisode[] = []): A
   const total = Math.min(Math.max(count, 1), 200);
   return Array.from({ length: total }, (_, i) => ({ number: i + 1 }));
 }
+
+/* ── أدوات مشتركة لتحويل بيانات AniList (تُستخدم في مسارات API) ── */
+export const ANILIST_STATUS_AR: Record<string, string> = {
+  FINISHED: "مكتمل",
+  RELEASING: "يُعرض حالياً",
+  NOT_YET_RELEASED: "لم يُعرض بعد",
+  CANCELLED: "ملغى",
+  HIATUS: "متوقف مؤقتاً",
+};
+
+export function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}

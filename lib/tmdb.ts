@@ -46,10 +46,6 @@ export function buildEmbedUrl(
       return m
         ? `https://moviesapi.to/movie/${id}`
         : `https://moviesapi.to/tv/${id}-${season}-${episode}`;
-    case "twoembed":
-      return m
-        ? `https://www.2embed.cc/embed/tmdb/movie?id=${id}`
-        : `https://www.2embed.cc/embed/tmdb/tv?id=${id}&s=${season}&e=${episode}`;
     case "vidfast":
       return m
         ? `https://vidfast.vc/movie/${id}?autoPlay=true`
@@ -58,10 +54,6 @@ export function buildEmbedUrl(
       return m
         ? `https://www.vidking.net/embed/movie/${id}?${VIDKING_PARAMS}`
         : `https://www.vidking.net/embed/tv/${id}/${season}/${episode}?${VIDKING_TV_PARAMS}`;
-    case "vidsrc":
-      return m
-        ? `https://vidsrc.to/embed/movie?tmdb=${id}&ds_lang=ar`
-        : `https://vidsrc.to/embed/tv?tmdb=${id}&season=${season}&episode=${episode}&ds_lang=ar`;
     case "vidsrcru":
       return m
         ? `https://vidsrc-embed.ru/embed/movie?tmdb=${id}&ds_lang=ar`
@@ -74,23 +66,26 @@ export function buildEmbedUrl(
       return m
         ? `https://vidsrc.wiki/embed/movie/${id}?autoplay=1&color=2563eb`
         : `https://vidsrc.wiki/embed/tv/${id}/${season}/${episode}?autoplay=1&color=2563eb`;
-    case "vidnest":
+    case "cinejoy":
+      /* الموقع يمنع التضمين المباشر (X-Frame-Options: DENY) وlocalhost محجوب
+         من الصفحات العامة، لذا يُخدَم عبر بروكسي بنفس أصل التطبيق:
+         proxy.ts يعيد كتابة /watch/* إلى app/api/cinejoy. */
       return m
-        ? `https://vidnest.fun/movie/${id}`
-        : `https://vidnest.fun/tv/${id}/${season}/${episode}`;
-    case "flixer":
+        ? `/watch/movie/${id}`
+        : `/watch/tv/${id}/${season}/${episode}`;
+    case "nextbox":
       return m
-        ? `https://flixer.su/watch/movie/${id}`
-        : `https://flixer.su/watch/tv/${id}/${season}/${episode}`;
-    case "autoembed":
+        ? `https://nextbox.uno/player/movie/${id}`
+        : `https://nextbox.uno/player/tv/${id}/${season}/${episode}`;
+    case "moviebite":
       return m
-        ? `https://autoembed.co/movie/tmdb/${id}`
-        : `https://autoembed.co/tv/tmdb/${id}-${season}-${episode}`;
-    case "multiembed":
+        ? `https://moviebite.org/watch/movie/${id}/`
+        : `https://moviebite.org/watch/tv/${id}/season/${season}/episode/${episode}/`;
+    case "xullys":
     default:
       return m
-        ? `https://multiembed.mov/?video_id=${id}&tmdb=1`
-        : `https://multiembed.mov/?video_id=${id}&tmdb=1&s=${season}&e=${episode}`;
+        ? `https://xullys.xyz/watch/${id}?t=movie`
+        : `https://xullys.xyz/watch/${id}?t=tv&s=${season}&e=${episode}`;
   }
 }
 
@@ -100,21 +95,28 @@ export function buildEmbedUrl(
  * السيرفرات الأخرى يرفض مزوّدوها العمل داخل sandbox (يعرضون خطأ)،
  * لذا تبقى بدون حماية وقد تُظهر إعلانات منبثقة.
  */
-export const SERVERS = [
-  { id: "vidrock",    name: "VidRock",    ar: false, blockPopups: true  },
-  { id: "vidlink",    name: "VidLink",    ar: true,  blockPopups: true  },
-  { id: "moviesapi",  name: "MoviesAPI",  ar: false, blockPopups: true  },
-  { id: "twoembed",   name: "2Embed",     ar: false, blockPopups: true  },
-  { id: "vidfast",    name: "VidFast",    ar: false, blockPopups: false },
-  { id: "vidking",    name: "VidKing",    ar: false, blockPopups: false },
-  { id: "vidsrc",     name: "VidSrc",     ar: true,  blockPopups: false },
-  { id: "vidsrcru",   name: "VidSrc RU",  ar: true,  blockPopups: false },
-  { id: "vidsrcme",   name: "VidSrc ME",  ar: false, blockPopups: false },
-  { id: "vidsrcwiki", name: "VidSrc Wiki", ar: false, blockPopups: false },
-  { id: "vidnest",    name: "VidNest",    ar: false, blockPopups: false },
-  { id: "flixer",     name: "Flixer",     ar: false, blockPopups: false },
-  { id: "autoembed",  name: "AutoEmbed",  ar: false, blockPopups: false },
-  { id: "multiembed", name: "MultiEmbed", ar: false, blockPopups: false },
+export type Server = {
+  id: string;
+  name: string;
+  ar: boolean;
+  blockPopups: boolean;
+  /* السيرفرات المقفلة تُعرض بقفل متحرك ولا يمكن اختيارها */
+  locked?: boolean;
+};
+
+export const SERVERS: Server[] = [
+  { id: "xullys",     name: "سيرفر 1",  ar: false, blockPopups: true  },
+  { id: "nextbox",    name: "سيرفر 2",  ar: false, blockPopups: true  },
+  { id: "moviebite",  name: "سيرفر 3",  ar: false, blockPopups: true  },
+  { id: "vidsrcwiki", name: "سيرفر 4",  ar: false, blockPopups: false },
+  { id: "vidking",    name: "سيرفر 5",  ar: false, blockPopups: false },
+  { id: "vidrock",    name: "سيرفر 6",  ar: false, blockPopups: true,  locked: true },
+  { id: "vidlink",    name: "سيرفر 7",  ar: true,  blockPopups: true,  locked: true },
+  { id: "moviesapi",  name: "سيرفر 8",  ar: false, blockPopups: true,  locked: true },
+  { id: "vidfast",    name: "سيرفر 9",  ar: false, blockPopups: false, locked: true },
+  { id: "vidsrcru",   name: "سيرفر 10", ar: true,  blockPopups: false, locked: true },
+  { id: "vidsrcme",   name: "سيرفر 11", ar: false, blockPopups: false, locked: true },
+  { id: "cinejoy",    name: "سيرفر 12", ar: false, blockPopups: false, locked: true },
 ];
 
 export const GENRES_MOVIE: Record<number, string> = {

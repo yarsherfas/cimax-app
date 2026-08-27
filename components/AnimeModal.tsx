@@ -52,11 +52,14 @@ function AnimeVideoPlayer({
 
   return (
     <div className="space-y-3">
+      {/* MegaPlay يرفض العمل داخل iframe مقيّد (sandbox) — فيُعرض الصوت دون صورة
+          مع رسالة «Sandboxed our player is not allowed»، لذا تُستبعد الحماية هنا */}
       <EmbedPlayer
         src={url}
         title={`${item.title} — ح${episode}`}
         reloadKey={`${reloadKey}-${lang}-${episode}`}
         accent="violet"
+        blockPopups={false}
       />
 
       <a

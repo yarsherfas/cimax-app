@@ -27,3 +27,14 @@ body {
 @media (max-width: 767px) {
   .top10-num { -webkit-text-stroke-width: 2px; }
 }
+
+/* قفل السيرفرات المقفلة — اهتزاز خفيف متكرر */
+@keyframes lock-jiggle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  15%      { transform: rotate(-14deg) scale(1.08); }
+  30%      { transform: rotate(11deg); }
+  45%      { transform: rotate(-7deg); }
+  60%      { transform: rotate(4deg) scale(1.05); }
+  75%      { transform: rotate(0deg) scale(1); }
+}
+.lock-jiggle { animation: lock-jiggle 2.4s ease-in-out infinite; }
