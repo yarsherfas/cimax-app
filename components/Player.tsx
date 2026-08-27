@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Loader2, Play, X, ArrowRight, Share2, User,
-  BookOpen, Users, Clapperboard, ListVideo, Film,
+  BookOpen, Users, Clapperboard, ListVideo, Film, Lock,
 } from "lucide-react";
 import {
   BACKDROP, IMG, IMG_LG, PROFILE, GENRES_MOVIE, GENRES_TV,
@@ -24,7 +24,7 @@ export function VideoPlayer({
   /* تذكّر آخر سيرفر اختاره المستخدم + السيرفرات المُوقفة حمايتها */
   useEffect(() => {
     const saved = localStorage.getItem("cimax-server");
-    if (saved && SERVERS.some(s => s.id === saved)) setServer(saved);
+    if (saved && SERVERS.some(s => s.id === saved && !s.locked)) setServer(saved);
     try {
       const off = JSON.parse(localStorage.getItem("cimax-unprotected") || "[]");
       if (Array.isArray(off)) setUnprotected(new Set(off));
@@ -106,11 +106,19 @@ export function VideoPlayer({
       {/* servers row */}
       <div className="space-y-1.5">
         <p className="text-[11px] font-semibold text-zinc-500">
-          {SERVERS.length} سيرفر متاح — اضغط «ابدأ المشاهدة» ثم اختر سيرفراً بديلاً إن لزم
+          {SERVERS.filter(s => !s.locked).length} سيرفرات متاحة — الباقي مقفل حالياً 🔒
         </p>
         <div className="flex gap-2 overflow-x-auto pb-1
           [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1">
-          {SERVERS.map(s => (
+          {SERVERS.map(s => s.locked ? (
+            /* سيرفر مقفل — خلفية سوداء وقفل متحرك، غير قابل للاختيار */
+            <button key={s.id} disabled title="سيرفر مقفل"
+              className="flex flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-full
+                border border-white/10 bg-black px-3.5 py-1.5 text-[12px] font-bold text-zinc-600">
+              <Lock size={11} className="lock-jiggle text-zinc-500" />
+              {s.name}
+            </button>
+          ) : (
             <button key={s.id} onClick={() => pickServer(s.id)}
               className={`flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[12px] font-bold transition
                 ${server === s.id
