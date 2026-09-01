@@ -84,8 +84,8 @@ export function buildEmbedUrl(
     case "xullys":
     default:
       return m
-        ? `https://xullys.xyz/watch/${id}?t=movie`
-        : `https://xullys.xyz/watch/${id}?t=tv&s=${season}&e=${episode}`;
+        ? `https://nextbox.uno/player/movie/${id}`
+        : `https://nextbox.uno/player/tv/${id}/${season}/${episode}`;
   }
 }
 
