@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Loader2, Play, X, ArrowRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, Play, X } from "lucide-react";
 import {
   AnimeItem, AnimeEpisode, AnimeLang,
   ANIME_LANGS, buildAnimeEmbedUrl, buildEpisodeList,
@@ -8,83 +8,6 @@ import {
 } from "@/lib/anime";
 import { FavBtn } from "./ui";
 import { EmbedPlayer } from "./EmbedPlayer";
-
-function AnimeVideoPlayer({
-  item, episode, episodes, episodeCount,
-}: {
-  item: AnimeItem;
-  episode: number;
-  episodes: AnimeEpisode[];
-  episodeCount: number;
-}) {
-  const [lang, setLang] = useState<AnimeLang>("sub");
-  const [reloadKey, setReloadKey] = useState(0);
-
-  const epData = episodes.find(e => e.number === episode);
-  const embedId = epData?.embed_id;
-  const url = buildAnimeEmbedUrl(item.mal_id, episode, lang, embedId);
-
-  const langs = ANIME_LANGS.filter(l => {
-    if (l.id === "dub" && item.is_dub === 0) return false;
-    if (epData?.has_sub === false && l.id === "sub") return false;
-    if (epData?.has_dub === false && l.id === "dub") return false;
-    return true;
-  });
-
-  useEffect(() => {
-    setReloadKey(k => k + 1);
-  }, [lang, episode, embedId]);
-
-  useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      if (!event.origin.includes("megaplay.buzz")) return;
-      let data = event.data;
-      if (typeof data === "string") {
-        try { data = JSON.parse(data); } catch { return; }
-      }
-      if (data?.event === "complete" && episode < episodeCount) {
-        window.dispatchEvent(new CustomEvent("anime-next-ep"));
-      }
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [episode, episodeCount]);
-
-  return (
-    <div className="space-y-3">
-      {/* MegaPlay يرفض العمل داخل iframe مقيّد (sandbox) — فيُعرض الصوت دون صورة
-          مع رسالة «Sandboxed our player is not allowed»، لذا تُستبعد الحماية هنا */}
-      <EmbedPlayer
-        src={url}
-        title={`${item.title} — ح${episode}`}
-        reloadKey={`${reloadKey}-${lang}-${episode}`}
-        accent="violet"
-        blockPopups={false}
-      />
-
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex text-[11px] font-semibold text-zinc-500 hover:text-violet-400 transition"
-      >
-        فتح المشغّل في نافذة جديدة إذا لم يستجب
-      </a>
-
-      <div className="flex gap-2">
-        {langs.map(l => (
-          <button key={l.id} onClick={() => setLang(l.id)}
-            className={`rounded-lg border px-4 py-1.5 text-[12px] font-bold transition
-              ${lang === l.id
-                ? "bg-white border-white text-black"
-                : "bg-[#15151a] border-white/10 text-zinc-300 hover:border-white/40 hover:text-white"}`}>
-            {l.name}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export function AnimeModal({
   item, onClose, favSet, toggleFav,
@@ -97,7 +20,8 @@ export function AnimeModal({
   const [details, setDetails]       = useState<AnimeItem>(item);
   const [episodes, setEpisodes]     = useState<AnimeEpisode[]>([]);
   const [episode, setEpisode]       = useState(1);
-  const [showPlayer, setShowPlayer] = useState(false);
+  const [lang, setLang]             = useState<AnimeLang>("sub");
+  const [reloadKey, setReloadKey]   = useState(0);
   const [loadingEps, setLoadingEps] = useState(true);
 
   const isFav = favSet.has(`anime-${item.mal_id}`);
@@ -105,6 +29,21 @@ export function AnimeModal({
   const episodeList = buildEpisodeList(episodeCount, episodes);
   const genres = (details.genres || []).join(" · ");
 
+  const epData = episodes.find(e => e.number === episode);
+  const embedId = epData?.embed_id;
+  const url = buildAnimeEmbedUrl(item.mal_id, episode, lang, embedId);
+
+  const langs = useMemo(
+    () => ANIME_LANGS.filter(l => {
+      if (l.id === "dub" && details.is_dub === 0) return false;
+      if (epData?.has_sub === false && l.id === "sub") return false;
+      if (epData?.has_dub === false && l.id === "dub") return false;
+      return true;
+    }),
+    [details.is_dub, epData?.has_sub, epData?.has_dub],
+  );
+
+  /* تحميل تفاصيل المسلسل + الحلقات + بيانات MAL */
   useEffect(() => {
     let alive = true;
     setLoadingEps(true);
@@ -132,11 +71,34 @@ export function AnimeModal({
     return () => { alive = false; };
   }, [item.id, item.mal_id]);
 
+  /* إعادة تحميل المشغّل عند تغيّر اللغة/الحلقة */
   useEffect(() => {
-    const next = () => setEpisode(e => Math.min(e + 1, episodeCount));
-    window.addEventListener("anime-next-ep", next);
-    return () => window.removeEventListener("anime-next-ep", next);
-  }, [episodeCount]);
+    setReloadKey(k => k + 1);
+  }, [lang, episode, embedId]);
+
+  /* إن أصبحت اللغة الحالية غير متاحة للحلقة، عُد إلى المترجمة */
+  useEffect(() => {
+    if (langs.length > 0 && !langs.some(l => l.id === lang)) setLang("sub");
+  }, [langs, lang]);
+
+  /* MegaPlay يُعلن انتهاء الحلقة عبر postMessage — انتقل للتالية تلقائياً */
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (!event.origin.includes("megaplay.buzz")) return;
+      let data = event.data;
+      if (typeof data === "string") {
+        try { data = JSON.parse(data); } catch { return; }
+      }
+      if (data?.event === "complete" && episode < episodeCount) {
+        setEpisode(e => Math.min(e + 1, episodeCount));
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [episode, episodeCount]);
+
+  /* اختصار للسلسلة بالحلقات */
+  const selectEpisode = (n: number) => setEpisode(n);
 
   return (
     <div
@@ -144,72 +106,116 @@ export function AnimeModal({
       onClick={onClose}
     >
       <div
-        className={`relative w-full md:max-w-4xl max-h-[94vh] rounded-t-2xl md:rounded-2xl bg-zinc-950 ring-1 ring-white/10
-          [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1
-          ${showPlayer ? "overflow-hidden" : "overflow-y-auto"}`}
+        className="relative flex w-full max-h-[94vh] flex-col overflow-hidden rounded-t-2xl bg-zinc-950
+          ring-1 ring-white/10 md:max-w-6xl md:rounded-2xl"
         onClick={e => e.stopPropagation()}
       >
-        {!showPlayer ? (
-          <>
-            <div className="relative h-44 md:h-56 w-full overflow-hidden flex-shrink-0 bg-violet-950/30">
-              {details.poster && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={details.poster} alt=""
-                  className="h-full w-full object-cover opacity-40 blur-sm scale-110" />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/60 to-transparent" />
-              <button onClick={onClose}
-                className="absolute left-3 top-3 flex h-9 w-9 items-center justify-center
-                  rounded-full bg-black/60 text-white hover:bg-white hover:text-black transition">
-                <X size={18} />
-              </button>
-              <button onClick={() => setShowPlayer(true)}
-                className="absolute inset-0 flex items-center justify-center group">
-                <span className="flex h-16 w-16 items-center justify-center rounded-full
-                  bg-white/95 text-black shadow-2xl shadow-black/50
-                  group-hover:scale-110 transition-transform">
-                  <Play size={26} className="fill-black" />
-                </span>
-              </button>
+        {/* ── شريط علوي: العنوان + الإغلاق/المفضلة ── */}
+        <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-white/5 px-4 py-3 md:px-5">
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-bold text-violet-400">أنيمي</span>
+            <div className="flex items-center gap-2">
+              <h1 className="truncate text-lg font-extrabold text-white md:text-xl">{details.title}</h1>
+              <span className="flex-shrink-0 text-sm font-bold text-violet-400">· ح{episode}</span>
             </div>
+          </div>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <FavBtn active={isFav} onToggle={() => toggleFav(item)} size={40} />
+            <button onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-zinc-300
+                transition hover:bg-white hover:text-black">
+              <X size={18} />
+            </button>
+          </div>
+        </div>
 
-            <div className="px-5 md:px-8 pb-8 -mt-10 relative">
-              <div className="flex items-end gap-4">
-                {details.poster && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={details.poster} alt=""
-                    className="w-24 md:w-28 rounded-xl shadow-xl ring-1 ring-white/10 flex-shrink-0" />
+        {/* ── جسم قابل للتمرير ── */}
+        <div className="flex-1 overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1">
+
+          {/* المشغّل أعلى الصفحة */}
+          <div className="px-3 pt-3 md:px-5 md:pt-5">
+            <EmbedPlayer
+              src={url}
+              title={`${details.title} — ح${episode}`}
+              reloadKey={`${reloadKey}-${lang}-${episode}`}
+              accent="violet"
+              blockPopups={false}
+              aspect
+            />
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex text-[11px] font-semibold text-zinc-500 hover:text-violet-400 transition"
+            >
+              فتح المشغّل في نافذة جديدة إذا لم يستجب
+            </a>
+          </div>
+
+          {/* عمودان: التفاصيل يميناً / الحلقات يساراً (مرآة RTL) */}
+          <div className="grid gap-5 p-3 md:gap-6 md:p-5 lg:grid-cols-[1fr_340px]">
+
+            {/* ── العمود الأيسر: التفاصيل ── */}
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+                {details.score && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-black/70 px-2 py-1
+                    font-bold text-amber-300 ring-1 ring-white/10 backdrop-blur">
+                    ⭐ {details.score}
+                  </span>
                 )}
-                <div className="flex-1 pb-1">
-                  <span className="text-[10px] font-bold text-violet-400">أنيمي</span>
-                  <h1 className="text-xl md:text-2xl font-extrabold text-white">{details.title}</h1>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-                    {details.score && <span>⭐ {details.score}</span>}
-                    {details.year && <span>{details.year}</span>}
-                    {details.status && <span className="text-zinc-500">· {details.status}</span>}
-                    {genres && <span className="text-zinc-500">· {genres}</span>}
-                  </div>
-                </div>
-                <FavBtn active={isFav} onToggle={() => toggleFav(item)} size={40} />
+                {details.year && <span className="font-bold text-zinc-300">{details.year}</span>}
+                {details.status && <span className="text-zinc-500">· {details.status}</span>}
+                <span className="text-zinc-500">· {episodeCount} حلقة</span>
+                {genres && <span className="text-zinc-500">· {genres}</span>}
               </div>
 
-              <p className="mt-5 text-sm leading-7 text-zinc-300 line-clamp-6">
-                {details.description || "لا يوجد وصف متوفر."}
-              </p>
+              {/* اختيار اللغة */}
+              {langs.length > 1 && (
+                <div className="flex flex-wrap gap-2">
+                  {langs.map(l => (
+                    <button key={l.id} onClick={() => setLang(l.id)}
+                      className={`rounded-lg border px-4 py-1.5 text-[12px] font-bold transition
+                        ${lang === l.id
+                          ? "border-white bg-white text-black"
+                          : "border-white/10 bg-[#15151a] text-zinc-300 hover:border-white/40 hover:text-white"}`}>
+                      {l.name}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-              <button
-                onClick={() => setShowPlayer(true)}
-                className="mt-5 flex items-center gap-2 rounded-full bg-white px-7 py-3
-                  text-sm font-extrabold text-black shadow-xl shadow-black/40
-                  hover:bg-zinc-200 transition"
-              >
-                <Play size={16} className="fill-black" />
-                مشاهدة الحلقة 1
-              </button>
+              {/* التنقل بين الحلقات */}
+              <div className="flex items-center justify-between rounded-xl bg-zinc-900 px-4 py-3">
+                <button
+                  disabled={episode <= 1}
+                  onClick={() => setEpisode(e => e - 1)}
+                  className="rounded-lg bg-zinc-800 px-3 py-1.5 text-xs font-bold text-zinc-300
+                    disabled:opacity-30 hover:text-violet-400 transition">
+                  ← السابقة
+                </button>
+                <span className="text-xs text-zinc-400">الحلقة {episode} / {episodeCount}</span>
+                <button
+                  disabled={episode >= episodeCount}
+                  onClick={() => setEpisode(e => e + 1)}
+                  className="rounded-full bg-white px-4 py-1.5 text-xs font-bold text-black
+                    disabled:opacity-30 hover:bg-zinc-200 transition">
+                  التالية →
+                </button>
+              </div>
 
-              <div className="mt-6 space-y-3">
-                <h3 className="text-sm font-bold text-zinc-300">الحلقات</h3>
-                <div className="max-h-64 overflow-y-auto rounded-xl ring-1 ring-white/10
+              {/* القصة */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-bold text-zinc-300">القصة</h3>
+                <p dir="auto" className="text-sm leading-7 text-zinc-300 line-clamp-6">
+                  {details.description || "لا يوجد وصف متوفر."}
+                </p>
+              </div>
+
+              {/* قائمة الحلقات (موبايل) */}
+              <div className="lg:hidden">
+                <h3 className="mb-3 text-sm font-bold text-zinc-300">الحلقات</h3>
+                <div className="max-h-64 space-y-1 overflow-y-auto rounded-xl ring-1 ring-white/10
                   [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1">
                   {loadingEps ? (
                     <div className="flex justify-center py-8">
@@ -218,9 +224,9 @@ export function AnimeModal({
                   ) : (
                     episodeList.map(ep => (
                       <button key={ep.number}
-                        onClick={() => { setEpisode(ep.number); setShowPlayer(true); }}
+                        onClick={() => selectEpisode(ep.number)}
                         className={`flex w-full items-center gap-3 border-b border-white/5
-                          px-3 py-2.5 text-right transition hover:bg-white/5
+                          px-3 py-2.5 text-right transition hover:bg-white/5 last:border-0
                           ${episode === ep.number ? "bg-white/5 border-r-2 border-r-white" : ""}`}>
                         <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center
                           rounded-lg text-xs font-extrabold
@@ -229,63 +235,53 @@ export function AnimeModal({
                             : "bg-[#1c1c22] text-zinc-300 ring-1 ring-white/10"}`}>
                           {ep.number}
                         </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="line-clamp-1 text-[12px] font-semibold text-white">
-                            {ep.title || `الحلقة ${ep.number}`}
-                          </p>
-                        </div>
-                        <Play size={12} className="text-zinc-500 flex-shrink-0" />
+                        <p className="line-clamp-1 flex-1 min-w-0 text-[12px] font-semibold text-white">
+                          {ep.title || `الحلقة ${ep.number}`}
+                        </p>
+                        <Play size={12} className="flex-shrink-0 text-zinc-500" />
                       </button>
                     ))
                   )}
                 </div>
               </div>
             </div>
-          </>
-        ) : (
-          <div className="p-3 md:p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <button onClick={() => setShowPlayer(false)}
-                className="flex items-center gap-1.5 text-sm font-bold text-zinc-300 hover:text-violet-400 transition">
-                <ArrowRight size={16} /> رجوع
-              </button>
-              <span className="text-sm font-bold text-white line-clamp-1">
-                {details.title}
-                <span className="text-violet-400 mr-1">· ح{episode}</span>
-              </span>
-              <button onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-full
-                  bg-zinc-900 text-zinc-400 hover:text-white transition">
-                <X size={16} />
-              </button>
-            </div>
 
-            <AnimeVideoPlayer
-              item={details}
-              episode={episode}
-              episodes={episodes}
-              episodeCount={episodeCount}
-            />
-
-            <div className="mt-4 flex items-center justify-between rounded-xl bg-zinc-900 px-4 py-3">
-              <button
-                disabled={episode <= 1}
-                onClick={() => setEpisode(e => e - 1)}
-                className="rounded-lg bg-zinc-800 px-3 py-1.5 text-xs font-bold text-zinc-300
-                  disabled:opacity-30 hover:text-violet-400 transition">
-                ← السابقة
-              </button>
-              <span className="text-xs text-zinc-400">الحلقة {episode} / {episodeCount}</span>
-              <button
-                disabled={episode >= episodeCount}
-                onClick={() => setEpisode(e => e + 1)}
-                className="rounded-full bg-white px-4 py-1.5 text-xs font-bold text-black
-                  disabled:opacity-30 hover:bg-zinc-200 transition">
-                التالية →
-              </button>
-            </div>
+            {/* ── العمود الأيمن: قائمة الحلقات (سطح المكتب) ── */}
+            <aside className="hidden lg:block">
+              <h3 className="mb-3 text-sm font-bold text-zinc-300">الحلقات</h3>
+              <div className="flex max-h-[60vh] flex-col overflow-y-auto rounded-xl ring-1 ring-white/10
+                [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1">
+                {loadingEps ? (
+                  <div className="flex justify-center py-10">
+                    <Loader2 className="animate-spin text-violet-400" />
+                  </div>
+                ) : episodeList.length === 0 ? (
+                  <p className="py-8 text-center text-xs text-zinc-500">لا توجد حلقات</p>
+                ) : (
+                  episodeList.map(ep => (
+                    <button key={ep.number}
+                      onClick={() => selectEpisode(ep.number)}
+                      className={`flex w-full items-center gap-3 border-b border-white/5
+                        px-3 py-2.5 text-right transition hover:bg-white/5 last:border-0
+                        ${episode === ep.number ? "bg-white/5 border-r-2 border-r-white" : ""}`}>
+                      <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center
+                        rounded-lg text-xs font-extrabold
+                        ${episode === ep.number
+                          ? "bg-white text-black"
+                          : "bg-[#1c1c22] text-zinc-300 ring-1 ring-white/10"}`}>
+                        {ep.number}
+                      </span>
+                      <p className="line-clamp-1 flex-1 min-w-0 text-[12px] font-semibold text-white">
+                        {ep.title || `الحلقة ${ep.number}`}
+                      </p>
+                      <Play size={12} className="flex-shrink-0 text-zinc-500" />
+                    </button>
+                  ))
+                )}
+              </div>
+            </aside>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
