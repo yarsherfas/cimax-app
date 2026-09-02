@@ -17,6 +17,7 @@ export function EmbedPlayer({
   reloadKey,
   accent = "blue",
   blockPopups = true,
+  aspect = false,
 }: {
   src: string;
   title: string;
@@ -24,6 +25,8 @@ export function EmbedPlayer({
   accent?: "blue" | "violet";
   /** false for VidKing/VidLink — they block sandboxed embeds */
   blockPopups?: boolean;
+  /** true → 16:9 box that fills the container width (matches watch-page layout) */
+  aspect?: boolean;
 }) {
   const [loading, setLoading] = useState(true);
   const [activated, setActivated] = useState(false);
@@ -49,8 +52,8 @@ export function EmbedPlayer({
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-xl bg-black ring-1 ring-white/10"
-      style={{ height: "min(70vh, 720px)" }}
+      className={`relative w-full overflow-hidden rounded-xl bg-black ring-1 ring-white/10 ${aspect ? "aspect-video" : ""}`}
+      style={aspect ? undefined : { height: "min(70vh, 720px)" }}
     >
       {loading && (
         <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-zinc-950">

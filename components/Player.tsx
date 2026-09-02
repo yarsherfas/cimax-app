@@ -65,6 +65,7 @@ export function VideoPlayer({
         reloadKey={`${reloadKey}-${server}-${season}-${episode}`}
         accent="blue"
         blockPopups={blockPopups}
+        aspect
       />
 
       {/* حالة الحماية + مفتاح التبديل */}
@@ -167,7 +168,8 @@ function SectionTitle({ icon, children }: { icon: React.ReactNode; children: Rea
 }
 
 /* ═══════════════════════════════════════
-   نافذة التفاصيل الكاملة — تصميم صفحة العمل
+   نافذة المشاهدة — تنسيق صفحة العرض:
+   المشغّل أعلى ثم عمودان (تفاصيل + حلقات)
 ═══════════════════════════════════════ */
 export function DetailsModal({
   item, type, onClose, onSelect, favSet, toggleFav,
@@ -179,12 +181,12 @@ export function DetailsModal({
   toggleFav: (item: MediaItem, type: MediaType) => void;
 }) {
   const [details, setDetails] = useState<any>(null);
-  const [mode, setMode] = useState<"info" | "player" | "trailer">("info");
-  const [season, setSeason]         = useState(1);
-  const [episode, setEpisode]       = useState(1);
-  const [seasonEps, setSeasonEps]   = useState<Episode[]>([]);
+  const [mode, setMode]         = useState<"info" | "player" | "trailer">("info");
+  const [season, setSeason]     = useState(1);
+  const [episode, setEpisode]   = useState(1);
+  const [seasonEps, setSeasonEps] = useState<Episode[]>([]);
   const [loadingEps, setLoadingEps] = useState(false);
-  const [copied, setCopied]         = useState(false);
+  const [copied, setCopied]     = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   /* جلب التفاصيل + الممثلين + المشابه + الإعلان في طلب واحد */
@@ -267,19 +269,103 @@ export function DetailsModal({
     } catch {}
   };
 
+  const selectEpisode = (n: number) => {
+    setEpisode(n);
+    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /* ── صف حلقة واحدة (يُستخدم في الشريط الجانبي وفي الموبايل) ── */
+  const EpisodeRow = ({ ep, onPick }: { ep: Episode; onPick?: (n: number) => void }) => {
+    const active = episode === ep.episode_number;
+    return (
+      <button
+        onClick={() => (onPick ?? selectEpisode)(ep.episode_number)}
+        className={`group flex w-full items-start gap-3 border-b border-white/5
+          p-2.5 text-right transition last:border-0 hover:bg-white/5
+          ${active ? "bg-amber-400/5 border-r-2 border-r-amber-400" : ""}`}>
+        {/* صورة الحلقة */}
+        <div className="relative w-24 flex-shrink-0 md:w-28">
+          <div className="aspect-video overflow-hidden rounded-lg bg-[#1c1c22]">
+            {ep.still_path ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={`${IMG_LG}${ep.still_path}`} alt="" loading="lazy"
+                className="h-full w-full object-cover transition-transform
+                  duration-300 group-hover:scale-105" />
+            ) : (
+              <div className="flex h-full items-center justify-center text-zinc-600">
+                <Film size={18} />
+              </div>
+            )}
+          </div>
+          <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1.5
+            py-0.5 text-[9px] font-black text-white backdrop-blur">
+            {ep.episode_number}
+          </span>
+          <span className="absolute inset-0 flex items-center justify-center
+            rounded-lg bg-black/50 opacity-0 transition-opacity
+            group-hover:opacity-100">
+            <Play size={18} className="fill-white text-white" />
+          </span>
+        </div>
+        {/* نص الحلقة */}
+        <div className="min-w-0 flex-1 py-0.5">
+          <p className="line-clamp-1 text-[12px] font-bold text-white md:text-[13px]">
+            {ep.name}
+          </p>
+          <p className="mt-0.5 text-[10px] text-zinc-500">
+            {ep.air_date || "—"}{ep.runtime ? ` · ${ep.runtime} د` : ""}
+          </p>
+        </div>
+      </button>
+    );
+  };
+
+  /* ── كتلة الحلقات: مواسم + قائمة قابلة للتمرير ── */
+  const EpisodesBlock = ({ onPick }: { onPick?: (n: number) => void }) => (
+    <div>
+      {seasons > 1 && (
+        <div className="mb-3 flex gap-2 overflow-x-auto pb-1
+          [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {Array.from({ length: seasons }, (_, i) => i + 1).map(s => (
+            <button key={s}
+              onClick={() => { setSeason(s); setEpisode(1); }}
+              className={`flex-shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition
+                ${season === s
+                  ? "bg-amber-400 text-black"
+                  : "bg-[#1c1c22] text-zinc-300 ring-1 ring-white/10 hover:ring-white/40"}`}>
+              الموسم {s}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="overflow-y-auto rounded-xl bg-[#101014] ring-1 ring-white/10
+        [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1 lg:max-h-[60vh] max-h-64">
+        {loadingEps ? (
+          <div className="flex justify-center py-10">
+            <Loader2 className="animate-spin text-amber-400" />
+          </div>
+        ) : seasonEps.length === 0 ? (
+          <p className="py-10 text-center text-xs text-zinc-500">لا توجد حلقات</p>
+        ) : (
+          seasonEps.map(ep => <EpisodeRow key={ep.id} ep={ep} onPick={onPick} />)
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/85 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        ref={scrollRef}
-        className={`relative w-full md:max-w-5xl max-h-[94vh] rounded-t-2xl md:rounded-2xl bg-zinc-950 ring-1 ring-white/10
-          [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1
-          ${mode !== "info" ? "overflow-hidden" : "overflow-y-auto"}`}
+        className={`relative w-full max-h-[94vh] rounded-t-2xl bg-zinc-950
+          ring-1 ring-white/10 md:max-w-6xl md:rounded-2xl
+          ${mode === "info"
+            ? "overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1"
+            : "flex flex-col overflow-hidden"}`}
         onClick={e => e.stopPropagation()}
       >
-        {/* ═══════════ وضع التفاصيل ═══════════ */}
         {mode === "info" ? (
           <>
             {/* ── البانر ── */}
@@ -441,86 +527,7 @@ export function DetailsModal({
               {type === "tv" && (
                 <section className="mt-7">
                   <SectionTitle icon={<ListVideo size={16} />}>الحلقات</SectionTitle>
-
-                  {/* المواسم */}
-                  {seasons > 1 && (
-                    <div className="mb-3 flex gap-2 overflow-x-auto pb-1
-                      [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {Array.from({ length: seasons }, (_, i) => i + 1).map(s => (
-                        <button key={s}
-                          onClick={() => { setSeason(s); setEpisode(1); }}
-                          className={`flex-shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition
-                            ${season === s
-                              ? "bg-amber-400 text-black"
-                              : "bg-[#1c1c22] text-zinc-300 ring-1 ring-white/10 hover:ring-white/40"}`}>
-                          الموسم {s}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* قائمة الحلقات */}
-                  <div className="max-h-[26rem] overflow-y-auto rounded-xl bg-[#101014]
-                    ring-1 ring-white/10 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1">
-                    {loadingEps ? (
-                      <div className="flex justify-center py-10">
-                        <Loader2 className="animate-spin text-amber-400" />
-                      </div>
-                    ) : seasonEps.length === 0 ? (
-                      <p className="py-10 text-center text-xs text-zinc-500">لا توجد حلقات</p>
-                    ) : (
-                      seasonEps.map(ep => {
-                        const active = episode === ep.episode_number;
-                        return (
-                          <button key={ep.id}
-                            onClick={() => { setEpisode(ep.episode_number); setMode("player"); }}
-                            className={`group flex w-full items-start gap-3 border-b border-white/5
-                              p-2.5 text-right transition last:border-0 hover:bg-white/5
-                              ${active ? "bg-amber-400/5" : ""}`}>
-                            {/* صورة الحلقة */}
-                            <div className="relative w-24 flex-shrink-0 md:w-36">
-                              <div className="aspect-video overflow-hidden rounded-lg bg-[#1c1c22]">
-                                {ep.still_path ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={`${IMG_LG}${ep.still_path}`} alt="" loading="lazy"
-                                    className="h-full w-full object-cover transition-transform
-                                      duration-300 group-hover:scale-105" />
-                                ) : (
-                                  <div className="flex h-full items-center justify-center text-zinc-600">
-                                    <Film size={18} />
-                                  </div>
-                                )}
-                              </div>
-                              <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1.5
-                                py-0.5 text-[9px] font-black text-white backdrop-blur">
-                                {ep.episode_number}
-                              </span>
-                              <span className="absolute inset-0 flex items-center justify-center
-                                rounded-lg bg-black/50 opacity-0 transition-opacity
-                                group-hover:opacity-100">
-                                <Play size={18} className="fill-white text-white" />
-                              </span>
-                            </div>
-                            {/* نص الحلقة */}
-                            <div className="min-w-0 flex-1 py-0.5">
-                              <p className="line-clamp-1 text-[12px] font-bold text-white md:text-[13px]">
-                                {ep.name}
-                              </p>
-                              <p className="mt-0.5 text-[10px] text-zinc-500">
-                                {ep.air_date || "—"}{ep.runtime ? ` · ${ep.runtime} د` : ""}
-                              </p>
-                              {ep.overview && (
-                                <p dir="auto" className="mt-1 hidden text-[11px] leading-5 text-zinc-400
-                                  md:line-clamp-2">
-                                  {ep.overview}
-                                </p>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
+                  <EpisodesBlock onPick={n => { setEpisode(n); setMode("player"); }} />
                 </section>
               )}
 
@@ -541,81 +548,226 @@ export function DetailsModal({
               )}
             </div>
           </>
-        ) : mode === "trailer" && trailer ? (
-          /* ═══════════ وضع الإعلان ═══════════ */
-          <div className="p-3 md:p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <button onClick={() => setMode("info")}
-                className="flex items-center gap-1.5 text-sm font-bold text-zinc-300 transition hover:text-amber-400">
-                <ArrowRight size={16} /> رجوع
-              </button>
-              <span className="line-clamp-1 text-sm font-bold text-white">
-                الإعلان الرسمي · {title}
-              </span>
-              <button onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-full
-                  bg-zinc-900 text-zinc-400 transition hover:text-white">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="relative w-full overflow-hidden rounded-xl bg-black ring-1 ring-white/10"
-              style={{ aspectRatio: "16 / 9" }}>
-              <iframe
-                src={`https://www.youtube-nocookie.com/embed/${trailer.key}?autoplay=1&rel=0`}
-                title={`إعلان ${title}`}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="absolute inset-0 h-full w-full"
-              />
+        ) : (
+          <>
+        {/* ── شريط علوي: العنوان + الإغلاق/المفضلة ── */}
+        <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-white/5 px-4 py-3 md:px-5">
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-bold text-amber-400">{type === "tv" ? "مسلسل" : "فيلم"}</span>
+            <div className="flex items-center gap-2">
+              <h1 className="truncate text-lg font-extrabold text-white md:text-xl">{title}</h1>
+              {type === "tv" && (
+                <span className="flex-shrink-0 text-sm font-bold text-amber-400">· م{season} ح{episode}</span>
+              )}
             </div>
           </div>
-        ) : (
-          /* ═══════════ وضع المشغّل ═══════════ */
-          <div className="p-3 md:p-5">
-            {/* header */}
-            <div className="mb-3 flex items-center justify-between">
-              <button onClick={() => setMode("info")}
-                className="flex items-center gap-1.5 text-sm font-bold text-zinc-300 transition hover:text-amber-400">
-                <ArrowRight size={16} /> رجوع
-              </button>
-              <span className="line-clamp-1 text-sm font-bold text-white">
-                {title}
-                {type === "tv" && (
-                  <span className="mr-1 text-amber-400">· م{season} ح{episode}</span>
-                )}
-              </span>
-              <button onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-full
-                  bg-zinc-900 text-zinc-400 transition hover:text-white">
-                <X size={16} />
-              </button>
-            </div>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <button onClick={() => setMode("info")} title="رجوع للتفاصيل"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-zinc-300
+                transition hover:bg-white hover:text-black">
+              <ArrowRight size={18} />
+            </button>
+            <FavBtn active={isFav} onToggle={() => toggleFav(item, type)} size={40} />
+            <button onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-zinc-300
+                transition hover:bg-white hover:text-black">
+              <X size={18} />
+            </button>
+          </div>
+        </div>
 
-            <VideoPlayer item={item} type={type} season={season} episode={episode} />
+        {/* ── جسم قابل للتمرير ── */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1">
 
-            {/* TV ep nav */}
-            {type === "tv" && (
-              <div className="mt-4 flex items-center justify-between rounded-xl bg-zinc-900 px-4 py-3">
-                <button
-                  disabled={episode <= 1}
-                  onClick={() => setEpisode(e => e - 1)}
-                  className="rounded-lg bg-zinc-800 px-3 py-1.5 text-xs font-bold text-zinc-300
-                    transition hover:text-amber-400 disabled:opacity-30">
-                  ← السابقة
-                </button>
-                <span className="text-xs text-zinc-400">
-                  الموسم {season} · الحلقة {episode}
-                </span>
-                <button
-                  disabled={!seasonEps.length || episode >= seasonEps.length}
-                  onClick={() => setEpisode(e => e + 1)}
-                  className="rounded-full bg-amber-400 px-4 py-1.5 text-xs font-black text-black
-                    transition hover:bg-amber-300 disabled:opacity-30">
-                  التالية →
-                </button>
+          {/* المشغّل (أو الإعلان) أعلى الصفحة */}
+          <div className="px-3 pt-3 md:px-5 md:pt-5">
+            {mode === "trailer" && trailer ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <button onClick={() => setMode("player")}
+                    className="flex items-center gap-1.5 text-sm font-bold text-zinc-300 transition hover:text-amber-400">
+                    <ArrowRight size={16} /> رجوع للمشغّل
+                  </button>
+                  <span className="line-clamp-1 text-sm font-bold text-white">الإعلان الرسمي</span>
+                </div>
+                <div className="relative w-full overflow-hidden rounded-xl bg-black ring-1 ring-white/10"
+                  style={{ aspectRatio: "16 / 9" }}>
+                  <iframe
+                    src={`https://www.youtube-nocookie.com/embed/${trailer.key}?autoplay=1&rel=0`}
+                    title={`إعلان ${title}`}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="absolute inset-0 h-full w-full"
+                  />
+                </div>
               </div>
+            ) : (
+              <VideoPlayer item={item} type={type} season={season} episode={episode} />
             )}
           </div>
+
+          {/* عمودان: التفاصيل يميناً / الحلقات يساراً (مرآة RTL) — الأفلام عمود واحد */}
+          <div className={`grid gap-5 p-3 md:gap-6 md:p-5 ${type === "tv" ? "lg:grid-cols-[1fr_340px]" : ""}`}>
+
+            {/* ── العمود الأيسر: التفاصيل ── */}
+            <div className="space-y-5">
+              {details?.tagline && (
+                <p dir="auto" className="line-clamp-1 text-xs text-zinc-500">
+                  {details.tagline}
+                </p>
+              )}
+
+              {/* معلومات */}
+              <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+                <Rating value={rating} size="md" />
+                {year && <span className="font-bold text-zinc-300">{year}</span>}
+                <span className="text-zinc-600">·</span>
+                <span>{type === "tv" ? "مسلسل" : "فيلم"}</span>
+                {type === "movie" && !!details?.runtime && (
+                  <>
+                    <span className="text-zinc-600">·</span>
+                    <span>{details.runtime} دقيقة</span>
+                  </>
+                )}
+                {type === "tv" && details && (
+                  <>
+                    <span className="text-zinc-600">·</span>
+                    <span>{seasons} {seasons > 1 ? "مواسم" : "موسم"}</span>
+                  </>
+                )}
+                <MetaBadge>HD</MetaBadge>
+              </div>
+
+              {/* التصنيفات */}
+              {!!genres.length && (
+                <div className="flex flex-wrap gap-2">
+                  {genres.map(g => (
+                    <span key={g} className="rounded-full bg-white/5 px-3 py-1
+                      text-[11px] font-bold text-zinc-300 ring-1 ring-white/10">
+                      {g}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* أزرار الإجراءات */}
+              <div className="flex flex-wrap items-center gap-3">
+                {trailer && (
+                  <button onClick={() => setMode(m => m === "trailer" ? "player" : "trailer")}
+                    className="flex items-center gap-2 rounded-full bg-white/10 px-5 py-2.5
+                      text-sm font-bold text-white ring-1 ring-white/15 backdrop-blur
+                      transition hover:bg-white/20">
+                    <Clapperboard size={16} />
+                    {mode === "trailer" ? "رجوع للمشغّل" : "الإعلان"}
+                  </button>
+                )}
+
+                <button onClick={share} title="مشاركة"
+                  className="flex h-[46px] w-[46px] items-center justify-center rounded-full
+                    bg-white/5 text-zinc-300 ring-1 ring-white/15 backdrop-blur
+                    transition hover:bg-white/15 hover:text-white">
+                  <Share2 size={18} />
+                </button>
+                {copied && (
+                  <span className="text-[11px] font-bold text-emerald-400">تم نسخ الرابط ✓</span>
+                )}
+              </div>
+
+              {/* التنقل بين الحلقات (للمسلسلات) */}
+              {type === "tv" && (
+                <div className="flex items-center justify-between rounded-xl bg-zinc-900 px-4 py-3">
+                  <button
+                    disabled={episode <= 1}
+                    onClick={() => selectEpisode(episode - 1)}
+                    className="rounded-lg bg-zinc-800 px-3 py-1.5 text-xs font-bold text-zinc-300
+                      transition hover:text-amber-400 disabled:opacity-30">
+                    ← السابقة
+                  </button>
+                  <span className="text-xs text-zinc-400">
+                    الموسم {season} · الحلقة {episode}
+                  </span>
+                  <button
+                    disabled={!seasonEps.length || episode >= seasonEps.length}
+                    onClick={() => selectEpisode(episode + 1)}
+                    className="rounded-full bg-amber-400 px-4 py-1.5 text-xs font-black text-black
+                      transition hover:bg-amber-300 disabled:opacity-30">
+                    التالية →
+                  </button>
+                </div>
+              )}
+
+              {/* القصة */}
+              <section>
+                <SectionTitle icon={<BookOpen size={16} />}>القصة</SectionTitle>
+                <p dir="auto" className="text-[13px] leading-7 text-zinc-300">
+                  {item.overview || details?.overview || "لا يوجد وصف متوفر لهذا العمل."}
+                </p>
+              </section>
+
+              {/* طاقم العمل */}
+              {!!cast.length && (
+                <section>
+                  <SectionTitle icon={<Users size={16} />}>طاقم العمل</SectionTitle>
+                  <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-2
+                    [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1">
+                    {cast.map(c => (
+                      <div key={`cast-${c.id}`}
+                        className="flex w-16 flex-shrink-0 flex-col items-center gap-1.5 text-center md:w-20">
+                        {c.profile_path ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={`${PROFILE}${c.profile_path}`} alt={c.name} loading="lazy"
+                            className="h-16 w-16 rounded-full object-cover ring-1 ring-white/15 md:h-20 md:w-20" />
+                        ) : (
+                          <div className="flex h-16 w-16 items-center justify-center rounded-full
+                            bg-[#1c1c22] text-zinc-600 ring-1 ring-white/10 md:h-20 md:w-20">
+                            <User size={22} />
+                          </div>
+                        )}
+                        <p className="line-clamp-1 w-full text-[11px] font-bold text-zinc-200">{c.name}</p>
+                        {c.character && (
+                          <p className="line-clamp-1 w-full text-[10px] text-zinc-500">{c.character}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* الحلقات (موبايل) */}
+              {type === "tv" && (
+                <div className="lg:hidden">
+                  <SectionTitle icon={<ListVideo size={16} />}>الحلقات</SectionTitle>
+                  <EpisodesBlock />
+                </div>
+              )}
+            </div>
+
+            {/* ── العمود الأيمن: الحلقات (سطح المكتب) ── */}
+            {type === "tv" && (
+              <aside className="hidden lg:block">
+                <SectionTitle icon={<ListVideo size={16} />}>الحلقات</SectionTitle>
+                <EpisodesBlock />
+              </aside>
+            )}
+          </div>
+
+          {/* أعمال مشابهة — بعرض كامل أسفل الشبكة */}
+          {!!similar.length && onSelect && (
+            <section className="px-3 pb-6 md:px-5">
+              <SectionTitle icon={<Clapperboard size={16} />}>أعمال مشابهة</SectionTitle>
+              <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2
+                [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {similar.map(sim => (
+                  <div key={`sim-${sim.id}`} className="w-[110px] flex-shrink-0 md:w-[130px]">
+                    <PosterCard item={sim} type={type}
+                      onSelect={onSelect} favSet={favSet} toggleFav={toggleFav} />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+          </>
         )}
       </div>
     </div>
