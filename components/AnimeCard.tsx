@@ -1,6 +1,7 @@
 "use client";
 import { Bookmark, Film, Play } from "lucide-react";
 import type { AnimeItem } from "@/lib/anime";
+import { useLanguage } from "./LanguageProvider";
 
 export function AnimeCard({
   item, onSelect, favSet, toggleFav,
@@ -10,6 +11,7 @@ export function AnimeCard({
   favSet: Set<string>;
   toggleFav: (item: AnimeItem) => void;
 }) {
+  const { t } = useLanguage();
   const isFav = favSet.has(`anime-${item.mal_id}`);
 
   return (
@@ -68,7 +70,7 @@ export function AnimeCard({
         <div className="absolute inset-x-2 bottom-2">
           <h3 className="line-clamp-2 text-[12px] font-bold text-white leading-snug">{item.title}</h3>
           <p className="text-[10px] text-zinc-400">
-            أنيمي{item.episodes ? ` · ${item.episodes} ح` : ""}
+            {t.media.anime}{item.episodes ? ` · ${item.episodes} ${t.player.episodeShort}` : ""}
             {item.year ? ` · ${item.year}` : ""}
           </p>
         </div>

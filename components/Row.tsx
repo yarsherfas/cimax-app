@@ -3,19 +3,24 @@ import { useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MediaItem, MediaType } from "@/lib/tmdb";
 import { PosterCard, SkeletonCard } from "./ui";
+import { useLanguage } from "./LanguageProvider";
 
 function ScrollBtns({ scroll, className = "" }: { scroll: (d: number) => void; className?: string }) {
+  const { locale, t } = useLanguage();
+  /* في الواجهة العربية RTL: زر «السابق» يعرض سهم اليمين والعكس صحيح للإنجليزية */
+  const PreviousIcon = locale === "en" ? ChevronLeft : ChevronRight;
+  const NextIcon = locale === "en" ? ChevronRight : ChevronLeft;
   return (
     <div className={`hidden md:flex gap-2 ${className}`}>
-      <button onClick={() => scroll(-1)} aria-label="السابق"
+      <button onClick={() => scroll(-1)} aria-label={t.misc.previous}
         className="rounded-full bg-white/10 p-2 text-white ring-1 ring-white/10 backdrop-blur
           transition hover:bg-white hover:text-black">
-        <ChevronRight size={16} />
+        <PreviousIcon size={16} />
       </button>
-      <button onClick={() => scroll(1)} aria-label="التالي"
+      <button onClick={() => scroll(1)} aria-label={t.misc.next}
         className="rounded-full bg-white/10 p-2 text-white ring-1 ring-white/10 backdrop-blur
           transition hover:bg-white hover:text-black">
-        <ChevronLeft size={16} />
+        <NextIcon size={16} />
       </button>
     </div>
   );
@@ -78,6 +83,7 @@ export function TrendingRow({
   favSet: Set<string>;
   toggleFav: (item: MediaItem, type: MediaType) => void;
 }) {
+  const { t } = useLanguage();
   const ref = useRef<HTMLDivElement>(null);
   const scroll = (d: number) =>
     ref.current?.scrollBy({ left: d * -640, behavior: "smooth" });
@@ -85,7 +91,7 @@ export function TrendingRow({
   return (
     <section className="mb-8 md:mb-10">
       <div className="mb-3 flex items-center justify-between px-4 md:px-10">
-        <h2 className="text-base md:text-xl font-extrabold text-white">الأكثر رواجاً</h2>
+        <h2 className="text-base md:text-xl font-extrabold text-white">{t.media.trending}</h2>
         <ScrollBtns scroll={scroll} />
       </div>
       <div ref={ref}
@@ -120,6 +126,7 @@ export function TopTenRow({
   favSet: Set<string>;
   toggleFav: (item: MediaItem, type: MediaType) => void;
 }) {
+  const { locale } = useLanguage();
   const ref = useRef<HTMLDivElement>(null);
   const scroll = (d: number) =>
     ref.current?.scrollBy({ left: d * -760, behavior: "smooth" });
@@ -141,7 +148,7 @@ export function TopTenRow({
             ))
           : items.slice(0, 10).map((item, i) => (
               <div key={`${type}-top-${item.id}`}
-                className="group flex flex-shrink-0 items-center cursor-pointer"
+                className={`group flex flex-shrink-0 items-center cursor-pointer ${locale === "en" ? "flex-row-reverse" : ""}`}
                 onClick={() => onSelect(item, type)}>
                 <span className="top10-num text-[7rem] md:text-[9rem] transition-transform duration-300 group-hover:scale-105">
                   {i + 1}

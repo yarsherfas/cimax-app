@@ -13,7 +13,8 @@ export async function tmdb(
   if (!API_KEY) throw new Error("مفتاح TMDB غير موجود في .env.local");
   const qs = new URLSearchParams({
     api_key: API_KEY,
-    language: "ar",
+    /* اللغة قابلة للتخصيص من الواجهة بحسب لغة الزائر، والعربية هي الافتراضية */
+    language: (params.language as string) || "ar",
     ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
   });
   const res = await fetch(`${BASE}${path}?${qs}`, { next: { revalidate: 3600 } });
@@ -30,7 +31,8 @@ export function buildEmbedUrl(
   type: "movie" | "tv",
   id: number,
   season: number,
-  episode: number
+  episode: number,
+  lang = "ar"
 ) {
   const m = type === "movie";
   switch (server) {
@@ -56,8 +58,8 @@ export function buildEmbedUrl(
         : `https://www.vidking.net/embed/tv/${id}/${season}/${episode}?${VIDKING_TV_PARAMS}`;
     case "vidsrcru":
       return m
-        ? `https://vidsrc-embed.ru/embed/movie?tmdb=${id}&ds_lang=ar`
-        : `https://vidsrc-embed.ru/embed/tv?tmdb=${id}&season=${season}&episode=${episode}&ds_lang=ar`;
+        ? `https://vidsrc-embed.ru/embed/movie?tmdb=${id}&ds_lang=${lang}`
+        : `https://vidsrc-embed.ru/embed/tv?tmdb=${id}&season=${season}&episode=${episode}&ds_lang=${lang}`;
     case "vidsrcme":
       return m
         ? `https://vidsrcme.su/embed/movie/${id}`
@@ -97,26 +99,31 @@ export function buildEmbedUrl(
  */
 export type Server = {
   id: string;
-  name: string;
   ar: boolean;
   blockPopups: boolean;
   /* السيرفرات المقفلة تُعرض بقفل متحرك ولا يمكن اختيارها */
   locked?: boolean;
 };
 
+/* أسماء السيرفرات بحسب اللغة — الرقم فقط يتغير في الاسم */
+export function serverName(server: Server, locale: string): string {
+  const index = SERVERS.findIndex(s => s.id === server.id) + 1;
+  return locale === "en" ? `Server ${index}` : `سيرفر ${index}`;
+}
+
 export const SERVERS: Server[] = [
-  { id: "xullys",     name: "سيرفر 1",  ar: false, blockPopups: true  },
-  { id: "nextbox",    name: "سيرفر 2",  ar: false, blockPopups: true  },
-  { id: "moviebite",  name: "سيرفر 3",  ar: false, blockPopups: true  },
-  { id: "vidsrcwiki", name: "سيرفر 4",  ar: false, blockPopups: false },
-  { id: "vidking",    name: "سيرفر 5",  ar: false, blockPopups: false },
-  { id: "vidrock",    name: "سيرفر 6",  ar: false, blockPopups: true,  locked: true },
-  { id: "vidlink",    name: "سيرفر 7",  ar: true,  blockPopups: true,  locked: true },
-  { id: "moviesapi",  name: "سيرفر 8",  ar: false, blockPopups: true,  locked: true },
-  { id: "vidfast",    name: "سيرفر 9",  ar: false, blockPopups: false, locked: true },
-  { id: "vidsrcru",   name: "سيرفر 10", ar: true,  blockPopups: false, locked: true },
-  { id: "vidsrcme",   name: "سيرفر 11", ar: false, blockPopups: false, locked: true },
-  { id: "cinejoy",    name: "سيرفر 12", ar: false, blockPopups: false, locked: true },
+  { id: "xullys",     ar: false, blockPopups: true  },
+  { id: "nextbox",    ar: false, blockPopups: true  },
+  { id: "moviebite",  ar: false, blockPopups: true  },
+  { id: "vidsrcwiki", ar: false, blockPopups: false },
+  { id: "vidking",    ar: false, blockPopups: false },
+  { id: "vidrock",    ar: false, blockPopups: true,  locked: true },
+  { id: "vidlink",    ar: true,  blockPopups: true,  locked: true },
+  { id: "moviesapi",  ar: false, blockPopups: true,  locked: true },
+  { id: "vidfast",    ar: false, blockPopups: false, locked: true },
+  { id: "vidsrcru",   ar: true,  blockPopups: false, locked: true },
+  { id: "vidsrcme",   ar: false, blockPopups: false, locked: true },
+  { id: "cinejoy",    ar: false, blockPopups: false, locked: true },
 ];
 
 export const GENRES_MOVIE: Record<number, string> = {
@@ -130,6 +137,24 @@ export const GENRES_TV: Record<number, string> = {
   80: "جريمة", 18: "دراما", 10751: "عائلي",
   9648: "غموض", 10765: "خيال وفانتازيا", 37: "وسترن",
 };
+
+/* التصنيفات الإنجليزية — تُستخدم عندما تكون الواجهة بالإنجليزية */
+export const GENRES_MOVIE_EN: Record<number, string> = {
+  28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy",
+  80: "Crime", 18: "Drama", 14: "Fantasy", 27: "Horror",
+  9648: "Mystery", 10749: "Romance", 878: "Science Fiction",
+  53: "Thriller", 10751: "Family", 99: "Documentary",
+};
+export const GENRES_TV_EN: Record<number, string> = {
+  10759: "Action & Adventure", 16: "Animation", 35: "Comedy",
+  80: "Crime", 18: "Drama", 10751: "Family",
+  9648: "Mystery", 10765: "Sci-Fi & Fantasy", 37: "Western",
+};
+
+export function genresFor(type: "movie" | "tv", locale: string): Record<number, string> {
+  if (locale !== "en") return type === "tv" ? GENRES_TV : GENRES_MOVIE;
+  return type === "tv" ? GENRES_TV_EN : GENRES_MOVIE_EN;
+}
 
 export type MediaType = "movie" | "tv";
 export type MediaItem = {

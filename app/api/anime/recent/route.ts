@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mapAnikotoList } from "@/lib/anime";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const page = req.nextUrl.searchParams.get("page") || "1";
   const perPage = req.nextUrl.searchParams.get("per_page") || "24";

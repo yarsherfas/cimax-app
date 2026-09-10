@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { mapAnikotoList } from "@/lib/anime";
 import type { AnimeEpisode } from "@/lib/anime";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
