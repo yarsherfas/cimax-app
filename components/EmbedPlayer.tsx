@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Loader2, Play, Shield } from "lucide-react";
+import { useLanguage } from "./LanguageProvider";
 
 export const IFRAME_ALLOW =
   "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen";
@@ -28,6 +29,7 @@ export function EmbedPlayer({
   /** true → 16:9 box that fills the container width (matches watch-page layout) */
   aspect?: boolean;
 }) {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [activated, setActivated] = useState(false);
   const [warming, setWarming] = useState(false);
@@ -58,7 +60,7 @@ export function EmbedPlayer({
       {loading && (
         <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-zinc-950">
           <Loader2 className={`animate-spin ${spin}`} size={32} />
-          <span className="text-xs text-zinc-500">جاري تحميل المشغّل…</span>
+          <span className="text-xs text-zinc-500">{t.player.loading}</span>
         </div>
       )}
 
@@ -75,10 +77,10 @@ export function EmbedPlayer({
           >
             <Play size={26} className="fill-black" />
           </span>
-          <span className="text-sm font-bold text-white">اضغط لبدء المشاهدة</span>
+          <span className="text-sm font-bold text-white">{t.player.tapToStart}</span>
           <span className="flex items-center gap-1.5 text-[11px] text-zinc-500">
             <Shield size={12} />
-            {blockPopups ? "حماية من الإعلانات المنبثقة" : "اضغط مرة واحدة قبل التفاعل مع المشغّل"}
+            {blockPopups ? t.player.popupShield : t.player.tapOnce}
           </span>
         </button>
       )}
@@ -86,7 +88,7 @@ export function EmbedPlayer({
       {warming && (
         <div className="absolute inset-0 z-[25] flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
           <span className="rounded-lg bg-black/70 px-3 py-1.5 text-xs font-semibold text-zinc-300">
-            جاري تجهيز المشغّل…
+            {t.player.preparing}
           </span>
         </div>
       )}

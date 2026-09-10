@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ANILIST_STATUS_AR, stripHtml } from "@/lib/anime";
+import { ANILIST_STATUS_AR, ANILIST_STATUS_EN, stripHtml } from "@/lib/anime";
+
+export const dynamic = "force-dynamic";
 
 /* ── AniList GraphQL (المصدر الرئيسي — أثبت من Jikan) ── */
 const ANILIST_BY_MAL = `query ($idMal: Int) {
@@ -15,7 +17,7 @@ const ANILIST_BY_MAL = `query ($idMal: Int) {
   }
 }`;
 
-async function fromAniList(malId: string) {
+async function fromAniList(malId: string, locale: string) {
   const res = await fetch("https://graphql.anilist.co", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -27,13 +29,14 @@ async function fromAniList(malId: string) {
   if (!row) return null;
 
   const title = (row.title || {}) as { romaji?: string; english?: string };
+  const statusMap = locale === "en" ? ANILIST_STATUS_EN : ANILIST_STATUS_AR;
 
   return {
     mal_id: row.idMal,
-    title: title.romaji || title.english,
+    title: locale === "en" ? (title.english || title.romaji) : (title.romaji || title.english),
     episodes: typeof row.episodes === "number" ? row.episodes : undefined,
     score: row.averageScore ? (Number(row.averageScore) / 10).toFixed(2) : undefined,
-    status: row.status ? (ANILIST_STATUS_AR[String(row.status)] ?? String(row.status)) : undefined,
+    status: row.status ? (statusMap[String(row.status)] ?? String(row.status)) : undefined,
     description: row.description ? stripHtml(String(row.description)) : undefined,
     poster: row.coverImage?.large || undefined,
     genres: Array.isArray(row.genres) ? row.genres : undefined,
@@ -63,13 +66,14 @@ async function fromJikan(malId: string) {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ malId: string }> }
 ) {
   const { malId } = await params;
+  const locale = req.nextUrl.searchParams.get("lang") || "ar";
 
   try {
-    const info = await fromAniList(malId);
+    const info = await fromAniList(malId, locale);
     if (info) return NextResponse.json(info);
     return NextResponse.json({});
   } catch {

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Play, Info } from "lucide-react";
 import { BACKDROP, MediaItem, MediaType } from "@/lib/tmdb";
 import { FavBtn, Rating } from "./ui";
+import { useLanguage } from "./LanguageProvider";
 
 export function HeroCarousel({
   slides, onSelect, favSet, toggleFav,
@@ -12,6 +13,7 @@ export function HeroCarousel({
   favSet: Set<string>;
   toggleFav: (item: MediaItem, type: MediaType) => void;
 }) {
+  const { locale, t } = useLanguage();
   const [idx, setIdx] = useState(0);
   const DELAY = 7000;
 
@@ -42,7 +44,9 @@ export function HeroCarousel({
               className="h-full w-full object-cover object-top" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] via-black/40 to-black/20" />
-          <div className="absolute inset-0 bg-gradient-to-l from-[#0a0a0c]/90 via-[#0a0a0c]/25 to-transparent" />
+          <div className={`absolute inset-0 ${locale === "en"
+            ? "bg-gradient-to-r from-[#0a0a0c]/90 via-[#0a0a0c]/25 to-transparent"
+            : "bg-gradient-to-l from-[#0a0a0c]/90 via-[#0a0a0c]/25 to-transparent"}`} />
         </div>
       ))}
 
@@ -51,7 +55,7 @@ export function HeroCarousel({
         <div className="flex items-center gap-2 flex-wrap">
           <span className="rounded-md bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white
             ring-1 ring-white/20 backdrop-blur">
-            {type === "tv" ? "مسلسل" : "فيلم"}
+            {type === "tv" ? t.media.show : t.media.movie}
           </span>
           <Rating value={slide.vote_average} size="md" />
           {year && <span className="text-[12px] text-zinc-300">{year}</span>}
@@ -61,7 +65,7 @@ export function HeroCarousel({
           {title}
         </h1>
 
-        <p className="hidden md:block line-clamp-2 text-sm text-zinc-300 leading-6 max-w-xl">
+        <p dir="auto" className="hidden md:block line-clamp-2 text-sm text-zinc-300 leading-6 max-w-xl">
           {slide.overview}
         </p>
 
@@ -71,23 +75,23 @@ export function HeroCarousel({
             className="flex items-center gap-2 rounded-full bg-white px-7 py-3 text-sm font-extrabold
               text-black shadow-2xl shadow-black/50 transition hover:bg-zinc-200 active:scale-95"
           >
-            <Play size={16} className="fill-black" /> شاهد الآن
+            <Play size={16} className="fill-black" /> {t.misc.watchNow}
           </button>
           <button
             onClick={() => onSelect(slide, type)}
             className="flex items-center gap-2 rounded-full bg-white/10 px-6 py-3 text-sm font-bold
               text-white ring-1 ring-white/20 backdrop-blur transition hover:bg-white/20"
           >
-            <Info size={16} /> معلومات
+            <Info size={16} /> {t.misc.info}
           </button>
           <FavBtn active={isFav} onToggle={() => toggleFav(slide, type)} size={46} />
         </div>
       </div>
 
       {/* dots */}
-      <div className="absolute bottom-4 left-4 md:left-12 z-10 flex gap-1.5">
+      <div className={`absolute bottom-4 z-10 flex gap-1.5 ${locale === "en" ? "left-4 md:left-12" : "right-4 md:right-12"}`}>
         {slides.map((_, i) => (
-          <button key={i} onClick={() => setIdx(i)} aria-label={`شريحة ${i + 1}`}
+          <button key={i} onClick={() => setIdx(i)} aria-label={t.misc.slide(i + 1)}
             className={`h-1 rounded-full transition-all ${i === idx ? "w-7 bg-white" : "w-3 bg-white/30 hover:bg-white/60"}`} />
         ))}
       </div>

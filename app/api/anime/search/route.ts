@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ANILIST_STATUS_AR, stripHtml } from "@/lib/anime";
+import { ANILIST_STATUS_AR, ANILIST_STATUS_EN, stripHtml } from "@/lib/anime";
 import type { AnimeItem } from "@/lib/anime";
+
+export const dynamic = "force-dynamic";
 
 /* ── AniList GraphQL (المصدر الرئيسي — أثبت من Jikan) ── */
 const ANILIST_SEARCH = `query ($s: String) {
@@ -19,29 +21,30 @@ const ANILIST_SEARCH = `query ($s: String) {
   }
 }`;
 
-function mapAniList(row: Record<string, unknown>): AnimeItem | null {
+function mapAniList(row: Record<string, unknown>, locale: string): AnimeItem | null {
   const malId = Number(row.idMal);
   /* بعض أعمال AniList بلا صفحة MAL — لا يمكن تشغيلها عبر MegaPlay فتُستبعد */
   if (!malId) return null;
 
   const title = (row.title || {}) as { romaji?: string; english?: string };
   const cover = row.coverImage as { large?: string } | undefined;
+  const statusMap = locale === "en" ? ANILIST_STATUS_EN : ANILIST_STATUS_AR;
 
   return {
     id: malId,
     mal_id: malId,
-    title: String(title.romaji || title.english || "بلا عنوان"),
+    title: String(title.romaji || title.english || (locale === "en" ? "Untitled" : "بلا عنوان")),
     poster: cover?.large || "",
     description: row.description ? stripHtml(String(row.description)) : undefined,
     episodes: typeof row.episodes === "number" ? row.episodes : undefined,
     score: row.averageScore ? (Number(row.averageScore) / 10).toFixed(2) : undefined,
-    status: row.status ? (ANILIST_STATUS_AR[String(row.status)] ?? String(row.status)) : undefined,
+    status: row.status ? (statusMap[String(row.status)] ?? String(row.status)) : undefined,
     year: row.seasonYear ? Number(row.seasonYear) : undefined,
     genres: Array.isArray(row.genres) ? (row.genres as string[]) : undefined,
   };
 }
 
-async function searchAniList(q: string): Promise<AnimeItem[]> {
+async function searchAniList(q: string, locale: string): Promise<AnimeItem[]> {
   const res = await fetch("https://graphql.anilist.co", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -51,7 +54,7 @@ async function searchAniList(q: string): Promise<AnimeItem[]> {
   const data = await res.json();
   if (data?.errors) throw new Error("AniList GraphQL error");
   return (data?.data?.Page?.media || [])
-    .map(mapAniList)
+    .map((row: Record<string, unknown>) => mapAniList(row, locale))
     .filter((x: AnimeItem | null): x is AnimeItem => x !== null && !!x.poster);
 }
 
@@ -97,10 +100,11 @@ async function searchJikan(q: string): Promise<AnimeItem[]> {
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim();
+  const locale = req.nextUrl.searchParams.get("lang") || "ar";
   if (!q) return NextResponse.json({ items: [] });
 
   try {
-    const items = await searchAniList(q);
+    const items = await searchAniList(q, locale);
     return NextResponse.json({ items, source: "anilist" });
   } catch {
     try {

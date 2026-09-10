@@ -1,6 +1,7 @@
 "use client";
 import { Star, Bookmark, Film, Play } from "lucide-react";
 import { IMG, MediaItem, MediaType } from "@/lib/tmdb";
+import { useLanguage } from "./LanguageProvider";
 
 /* ── Rating pill ── */
 export function Rating({ value, size = "sm" }: { value?: number; size?: "sm" | "md" }) {
@@ -41,8 +42,9 @@ export function PosterCard({
   favSet: Set<string>;
   toggleFav: (item: MediaItem, type: MediaType) => void;
 }) {
+  const { t } = useLanguage();
   const year  = (item.release_date || item.first_air_date || "").slice(0, 4);
-  const title = item.title || item.name || "بلا عنوان";
+  const title = item.title || item.name || t.media.noTitle;
   const isFav = favSet.has(`${type}-${item.id}`);
 
   return (
@@ -94,7 +96,7 @@ export function PosterCard({
         <div className="absolute inset-x-2 bottom-2">
           <h3 className="line-clamp-1 text-[12px] font-bold text-white">{title}</h3>
           <p className="text-[10px] text-zinc-400">
-            {type === "movie" ? "فيلم" : "مسلسل"}{year ? ` · ${year}` : ""}
+            {type === "movie" ? t.media.movie : t.media.show}{year ? ` · ${year}` : ""}
           </p>
         </div>
       </div>

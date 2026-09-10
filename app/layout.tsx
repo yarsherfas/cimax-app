@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { LanguageProvider } from "@/components/LanguageProvider";
+import { LanguageSelector } from "@/components/LanguageSelector";
 
 export const metadata: Metadata = {
   title: "سيماماكس — أفلام ومسلسلات",
@@ -18,7 +20,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
-        {children}
+        <LanguageProvider>
+          {children}
+          <LanguageSelector />
+        </LanguageProvider>
       </body>
     </html>
   );

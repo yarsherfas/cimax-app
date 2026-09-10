@@ -25,9 +25,9 @@ export type AnimeEpisode = {
   has_dub?: boolean;
 };
 
-export const ANIME_LANGS: { id: AnimeLang; name: string }[] = [
-  { id: "sub", name: "مترجم" },
-  { id: "dub", name: "مدبلج" },
+export const ANIME_LANGS: { id: AnimeLang; name: Record<"ar" | "en", string> }[] = [
+  { id: "sub", name: { ar: "مترجم", en: "Subbed" } },
+  { id: "dub", name: { ar: "مدبلج", en: "Dubbed" } },
 ];
 
 export function buildAnimeEmbedUrl(
@@ -75,13 +75,13 @@ function mapAnikotoRow(row: Record<string, unknown>): AnimeItem | null {
   };
 }
 
-export async function fetchRecentAnime(page = 1, perPage = 24): Promise<{
+export async function fetchRecentAnime(page = 1, perPage = 24, locale: "ar" | "en" = "ar"): Promise<{
   items: AnimeItem[];
   page: number;
   totalPages: number;
 }> {
-  const res = await fetch(`/api/anime/recent?page=${page}&per_page=${perPage}`);
-  if (!res.ok) throw new Error("تعذّر تحميل قائمة الأنيمي");
+  const res = await fetch(`/api/anime/recent?page=${page}&per_page=${perPage}&lang=${locale}`);
+  if (!res.ok) throw new Error(locale === "en" ? "Failed to load the anime list" : "تعذّر تحميل قائمة الأنيمي");
   const data = await res.json();
   const items = (data.items || []) as AnimeItem[];
   return {
@@ -91,9 +91,9 @@ export async function fetchRecentAnime(page = 1, perPage = 24): Promise<{
   };
 }
 
-export async function searchAnime(query: string): Promise<AnimeItem[]> {
-  const res = await fetch(`/api/anime/search?q=${encodeURIComponent(query)}`);
-  if (!res.ok) throw new Error("تعذّر البحث عن أنيمي");
+export async function searchAnime(query: string, locale: "ar" | "en" = "ar"): Promise<AnimeItem[]> {
+  const res = await fetch(`/api/anime/search?q=${encodeURIComponent(query)}&lang=${locale}`);
+  if (!res.ok) throw new Error(locale === "en" ? "Failed to search anime" : "تعذّر البحث عن أنيمي");
   const data = await res.json();
   return (data.items || []) as AnimeItem[];
 }
@@ -111,8 +111,8 @@ export async function fetchAnimeSeries(anikotoId: number): Promise<{
   };
 }
 
-export async function fetchAnimeByMal(malId: number): Promise<Partial<AnimeItem>> {
-  const res = await fetch(`/api/anime/mal/${malId}`);
+export async function fetchAnimeByMal(malId: number, locale: "ar" | "en" = "ar"): Promise<Partial<AnimeItem>> {
+  const res = await fetch(`/api/anime/mal/${malId}?lang=${locale}`);
   if (!res.ok) return {};
   return res.json();
 }
@@ -135,6 +135,14 @@ export const ANILIST_STATUS_AR: Record<string, string> = {
   NOT_YET_RELEASED: "لم يُعرض بعد",
   CANCELLED: "ملغى",
   HIATUS: "متوقف مؤقتاً",
+};
+
+export const ANILIST_STATUS_EN: Record<string, string> = {
+  FINISHED: "Finished",
+  RELEASING: "Airing",
+  NOT_YET_RELEASED: "Not yet aired",
+  CANCELLED: "Cancelled",
+  HIATUS: "On hiatus",
 };
 
 export function stripHtml(html: string): string {

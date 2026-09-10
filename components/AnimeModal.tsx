@@ -8,6 +8,7 @@ import {
 } from "@/lib/anime";
 import { FavBtn } from "./ui";
 import { EmbedPlayer } from "./EmbedPlayer";
+import { useLanguage } from "./LanguageProvider";
 
 export function AnimeModal({
   item, onClose, favSet, toggleFav,
@@ -17,6 +18,7 @@ export function AnimeModal({
   favSet: Set<string>;
   toggleFav: (item: AnimeItem) => void;
 }) {
+  const { locale, t } = useLanguage();
   const [details, setDetails]       = useState<AnimeItem>(item);
   const [episodes, setEpisodes]     = useState<AnimeEpisode[]>([]);
   const [episode, setEpisode]       = useState(1);
@@ -51,7 +53,7 @@ export function AnimeModal({
     (async () => {
       const [series, malInfo] = await Promise.all([
         fetchAnimeSeries(item.id),
-        fetchAnimeByMal(item.mal_id),
+        fetchAnimeByMal(item.mal_id, locale),
       ]);
 
       if (!alive) return;
@@ -69,7 +71,7 @@ export function AnimeModal({
     })();
 
     return () => { alive = false; };
-  }, [item.id, item.mal_id]);
+  }, [item.id, item.mal_id, locale]);
 
   /* إعادة تحميل المشغّل عند تغيّر اللغة/الحلقة */
   useEffect(() => {
@@ -100,6 +102,9 @@ export function AnimeModal({
   /* اختصار للسلسلة بالحلقات */
   const selectEpisode = (n: number) => setEpisode(n);
 
+  const prevLabel = `← ${t.anime.previous}`;
+  const nextLabel = `${t.anime.next} →`;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/85 backdrop-blur-sm"
@@ -113,10 +118,10 @@ export function AnimeModal({
         {/* ── شريط علوي: العنوان + الإغلاق/المفضلة ── */}
         <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-white/5 px-4 py-3 md:px-5">
           <div className="min-w-0 flex-1">
-            <span className="text-[10px] font-bold text-violet-400">أنيمي</span>
+            <span className="text-[10px] font-bold text-violet-400">{t.media.anime}</span>
             <div className="flex items-center gap-2">
               <h1 className="truncate text-lg font-extrabold text-white md:text-xl">{details.title}</h1>
-              <span className="flex-shrink-0 text-sm font-bold text-violet-400">· ح{episode}</span>
+              <span className="flex-shrink-0 text-sm font-bold text-violet-400">· {t.player.episodeShort}{episode}</span>
             </div>
           </div>
           <div className="flex flex-shrink-0 items-center gap-2">
@@ -136,7 +141,7 @@ export function AnimeModal({
           <div className="px-3 pt-3 md:px-5 md:pt-5">
             <EmbedPlayer
               src={url}
-              title={`${details.title} — ح${episode}`}
+              title={`${details.title} — ${t.player.episodeShort}${episode}`}
               reloadKey={`${reloadKey}-${lang}-${episode}`}
               accent="violet"
               blockPopups={false}
@@ -148,14 +153,14 @@ export function AnimeModal({
               rel="noopener noreferrer"
               className="mt-2 inline-flex text-[11px] font-semibold text-zinc-500 hover:text-violet-400 transition"
             >
-              فتح المشغّل في نافذة جديدة إذا لم يستجب
+              {t.anime.openPlayer}
             </a>
           </div>
 
-          {/* عمودان: التفاصيل يميناً / الحلقات يساراً (مرآة RTL) */}
+          {/* عمودان: التفاصيل / الحلقات — الترتيب يتبع اتجاه الواجهة */}
           <div className="grid gap-5 p-3 md:gap-6 md:p-5 lg:grid-cols-[1fr_340px]">
 
-            {/* ── العمود الأيسر: التفاصيل ── */}
+            {/* ── العمود الأول: التفاصيل ── */}
             <div className="space-y-5">
               <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
                 {details.score && (
@@ -166,7 +171,7 @@ export function AnimeModal({
                 )}
                 {details.year && <span className="font-bold text-zinc-300">{details.year}</span>}
                 {details.status && <span className="text-zinc-500">· {details.status}</span>}
-                <span className="text-zinc-500">· {episodeCount} حلقة</span>
+                <span className="text-zinc-500">· {t.anime.episodesCount(episodeCount)}</span>
                 {genres && <span className="text-zinc-500">· {genres}</span>}
               </div>
 
@@ -179,7 +184,7 @@ export function AnimeModal({
                         ${lang === l.id
                           ? "border-white bg-white text-black"
                           : "border-white/10 bg-[#15151a] text-zinc-300 hover:border-white/40 hover:text-white"}`}>
-                      {l.name}
+                      {l.name[locale]}
                     </button>
                   ))}
                 </div>
@@ -192,29 +197,29 @@ export function AnimeModal({
                   onClick={() => setEpisode(e => e - 1)}
                   className="rounded-lg bg-zinc-800 px-3 py-1.5 text-xs font-bold text-zinc-300
                     disabled:opacity-30 hover:text-violet-400 transition">
-                  ← السابقة
+                  {prevLabel}
                 </button>
-                <span className="text-xs text-zinc-400">الحلقة {episode} / {episodeCount}</span>
+                <span className="text-xs text-zinc-400">{t.anime.episode} {episode} / {episodeCount}</span>
                 <button
                   disabled={episode >= episodeCount}
                   onClick={() => setEpisode(e => e + 1)}
                   className="rounded-full bg-white px-4 py-1.5 text-xs font-bold text-black
                     disabled:opacity-30 hover:bg-zinc-200 transition">
-                  التالية →
+                  {nextLabel}
                 </button>
               </div>
 
               {/* القصة */}
               <div className="space-y-2">
-                <h3 className="text-sm font-bold text-zinc-300">القصة</h3>
+                <h3 className="text-sm font-bold text-zinc-300">{t.anime.story}</h3>
                 <p dir="auto" className="text-sm leading-7 text-zinc-300 line-clamp-6">
-                  {details.description || "لا يوجد وصف متوفر."}
+                  {details.description || t.anime.noDescription}
                 </p>
               </div>
 
               {/* قائمة الحلقات (موبايل) */}
               <div className="lg:hidden">
-                <h3 className="mb-3 text-sm font-bold text-zinc-300">الحلقات</h3>
+                <h3 className="mb-3 text-sm font-bold text-zinc-300">{t.anime.episodes}</h3>
                 <div className="max-h-64 space-y-1 overflow-y-auto rounded-xl ring-1 ring-white/10
                   [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1">
                   {loadingEps ? (
@@ -227,7 +232,7 @@ export function AnimeModal({
                         onClick={() => selectEpisode(ep.number)}
                         className={`flex w-full items-center gap-3 border-b border-white/5
                           px-3 py-2.5 text-right transition hover:bg-white/5 last:border-0
-                          ${episode === ep.number ? "bg-white/5 border-r-2 border-r-white" : ""}`}>
+                          ${episode === ep.number ? "bg-white/5 border-s-2 border-s-white" : ""}`}>
                         <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center
                           rounded-lg text-xs font-extrabold
                           ${episode === ep.number
@@ -235,8 +240,8 @@ export function AnimeModal({
                             : "bg-[#1c1c22] text-zinc-300 ring-1 ring-white/10"}`}>
                           {ep.number}
                         </span>
-                        <p className="line-clamp-1 flex-1 min-w-0 text-[12px] font-semibold text-white">
-                          {ep.title || `الحلقة ${ep.number}`}
+                        <p dir="auto" className="line-clamp-1 flex-1 min-w-0 text-[12px] font-semibold text-white">
+                          {ep.title || `${t.anime.episode} ${ep.number}`}
                         </p>
                         <Play size={12} className="flex-shrink-0 text-zinc-500" />
                       </button>
@@ -246,9 +251,9 @@ export function AnimeModal({
               </div>
             </div>
 
-            {/* ── العمود الأيمن: قائمة الحلقات (سطح المكتب) ── */}
+            {/* ── العمود الثاني: قائمة الحلقات (سطح المكتب) ── */}
             <aside className="hidden lg:block">
-              <h3 className="mb-3 text-sm font-bold text-zinc-300">الحلقات</h3>
+              <h3 className="mb-3 text-sm font-bold text-zinc-300">{t.anime.episodes}</h3>
               <div className="flex max-h-[60vh] flex-col overflow-y-auto rounded-xl ring-1 ring-white/10
                 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1">
                 {loadingEps ? (
@@ -256,14 +261,14 @@ export function AnimeModal({
                     <Loader2 className="animate-spin text-violet-400" />
                   </div>
                 ) : episodeList.length === 0 ? (
-                  <p className="py-8 text-center text-xs text-zinc-500">لا توجد حلقات</p>
+                  <p className="py-8 text-center text-xs text-zinc-500">{t.anime.noEpisodes}</p>
                 ) : (
                   episodeList.map(ep => (
                     <button key={ep.number}
                       onClick={() => selectEpisode(ep.number)}
                       className={`flex w-full items-center gap-3 border-b border-white/5
                         px-3 py-2.5 text-right transition hover:bg-white/5 last:border-0
-                        ${episode === ep.number ? "bg-white/5 border-r-2 border-r-white" : ""}`}>
+                        ${episode === ep.number ? "bg-white/5 border-s-2 border-s-white" : ""}`}>
                       <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center
                         rounded-lg text-xs font-extrabold
                         ${episode === ep.number
@@ -271,8 +276,8 @@ export function AnimeModal({
                           : "bg-[#1c1c22] text-zinc-300 ring-1 ring-white/10"}`}>
                         {ep.number}
                       </span>
-                      <p className="line-clamp-1 flex-1 min-w-0 text-[12px] font-semibold text-white">
-                        {ep.title || `الحلقة ${ep.number}`}
+                      <p dir="auto" className="line-clamp-1 flex-1 min-w-0 text-[12px] font-semibold text-white">
+                        {ep.title || `${t.anime.episode} ${ep.number}`}
                       </p>
                       <Play size={12} className="flex-shrink-0 text-zinc-500" />
                     </button>

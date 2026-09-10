@@ -1,22 +1,25 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import {
-  Loader2, Play, X, ArrowRight, Share2, User,
+  Loader2, Play, X, ArrowRight, ArrowLeft, Share2, User,
   BookOpen, Users, Clapperboard, ListVideo, Film, Lock,
 } from "lucide-react";
 import {
-  BACKDROP, IMG, IMG_LG, PROFILE, GENRES_MOVIE, GENRES_TV,
+  BACKDROP, IMG, IMG_LG, PROFILE, genresFor,
   MediaItem, MediaType, Episode, CastMember,
-  SERVERS, buildEmbedUrl, tmdb,
+  SERVERS, serverName, buildEmbedUrl, tmdb,
 } from "@/lib/tmdb";
+import { localeConfig } from "@/lib/i18n";
 import { FavBtn, PosterCard, Rating } from "./ui";
 import { EmbedPlayer } from "./EmbedPlayer";
+import { useLanguage } from "./LanguageProvider";
 
 export function VideoPlayer({
   item, type, season, episode,
 }: {
   item: MediaItem; type: MediaType; season: number; episode: number;
 }) {
+  const { locale, t } = useLanguage();
   const [server, setServer] = useState(SERVERS[0].id);
   const [reloadKey, setReloadKey] = useState(0);
   const [unprotected, setUnprotected] = useState<Set<string>>(() => new Set());
@@ -48,9 +51,10 @@ export function VideoPlayer({
     setReloadKey(k => k + 1);
   };
 
-  const url = buildEmbedUrl(server, type, item.id, season, episode);
+  /* تلميح لغة الترجمة يتبع لغة الواجهة (ar / en) */
+  const url = buildEmbedUrl(server, type, item.id, season, episode, locale);
   const serverMeta = SERVERS.find(s => s.id === server);
-  const serverName = serverMeta?.name;
+  const serverLabel = serverMeta ? serverName(serverMeta, locale) : t.player.server;
   const blockPopups = serverMeta?.blockPopups !== false && !unprotected.has(server);
 
   useEffect(() => {
@@ -61,7 +65,7 @@ export function VideoPlayer({
     <div className="space-y-3">
       <EmbedPlayer
         src={url}
-        title={`${serverName} — ${item.title || item.name || "مشغّل"}`}
+        title={`${serverLabel} — ${item.title || item.name || t.player.playerFallback}`}
         reloadKey={`${reloadKey}-${server}-${season}-${episode}`}
         accent="blue"
         blockPopups={blockPopups}
@@ -72,12 +76,10 @@ export function VideoPlayer({
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-zinc-900/60 px-3 py-2">
         <p className="text-[11px] leading-5 text-zinc-400">
           {blockPopups ? (
-            <>🛡 <strong className="text-emerald-400">الحماية مفعّلة</strong> — لن تُفتح أي
-            تبويبات إعلانية. إن ظهر داخل المشغّل خطأ <span dir="ltr" className="text-zinc-500">Sandbox
-            Not Allowed</span> فالمزوّد يرفض الحماية.</>
+            <>🛡 <strong className="text-emerald-400">{t.player.protectionOn}</strong> — {t.player.protectionOnHint} <span dir="ltr" className="text-zinc-500">Sandbox
+            Not Allowed</span> {t.player.protectionOnHintEnd}</>
           ) : (
-            <>⚠️ <strong className="text-amber-400">الحماية متوقفة</strong> — قد تُفتح تبويبات
-            إعلانية عند النقر داخل المشغّل.</>
+            <>⚠️ <strong className="text-amber-400">{t.player.protectionOff}</strong> — {t.player.protectionOffHint}</>
           )}
         </p>
         {serverMeta?.blockPopups !== false && (
@@ -88,7 +90,7 @@ export function VideoPlayer({
                 ? "bg-zinc-800 text-zinc-300 hover:bg-amber-500/20 hover:text-amber-300"
                 : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"}`}
           >
-            {blockPopups ? "إيقاف الحماية وإعادة المحاولة" : "تشغيل الحماية"}
+            {blockPopups ? t.player.retryWithoutProtection : t.player.enableProtection}
           </button>
         )}
       </div>
@@ -100,24 +102,24 @@ export function VideoPlayer({
           rel="noopener noreferrer"
           className="inline-flex text-[11px] font-semibold text-zinc-500 hover:text-blue-400 transition"
         >
-          فتح VidKing في نافذة جديدة إذا لم يستجب المشغّل
+          {t.player.newWindowVidking}
         </a>
       )}
 
       {/* servers row */}
       <div className="space-y-1.5">
         <p className="text-[11px] font-semibold text-zinc-500">
-          {SERVERS.filter(s => !s.locked).length} سيرفرات متاحة — الباقي مقفل حالياً 🔒
+          {t.player.serversAvailable(SERVERS.filter(s => !s.locked).length)}
         </p>
         <div className="flex gap-2 overflow-x-auto pb-1
           [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1">
           {SERVERS.map(s => s.locked ? (
             /* سيرفر مقفل — خلفية سوداء وقفل متحرك، غير قابل للاختيار */
-            <button key={s.id} disabled title="سيرفر مقفل"
+            <button key={s.id} disabled title={t.player.lockedServer}
               className="flex flex-shrink-0 cursor-not-allowed items-center gap-1.5 rounded-full
                 border border-white/10 bg-black px-3.5 py-1.5 text-[12px] font-bold text-zinc-600">
               <Lock size={11} className="lock-jiggle text-zinc-500" />
-              {s.name}
+              {serverName(s, locale)}
             </button>
           ) : (
             <button key={s.id} onClick={() => pickServer(s.id)}
@@ -134,11 +136,11 @@ export function VideoPlayer({
               {s.blockPopups !== false && !unprotected.has(s.id) && (
                 <span className="flex h-3.5 w-3.5 items-center justify-center rounded-[3px]
                   bg-sky-500/20 ring-1 ring-sky-400/50 text-[8px] font-extrabold text-sky-400"
-                  title="حظر الإعلانات المنبثقة">
+                  title={t.player.popupBlock}>
                   🛡
                 </span>
               )}
-              {s.name}
+              {serverName(s, locale)}
             </button>
           ))}
         </div>
@@ -180,6 +182,7 @@ export function DetailsModal({
   favSet: Set<string>;
   toggleFav: (item: MediaItem, type: MediaType) => void;
 }) {
+  const { locale, t } = useLanguage();
   const [details, setDetails] = useState<any>(null);
   const [mode, setMode]         = useState<"info" | "player" | "trailer">("info");
   const [season, setSeason]     = useState(1);
@@ -189,15 +192,15 @@ export function DetailsModal({
   const [copied, setCopied]     = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  /* جلب التفاصيل + الممثلين + المشابه + الإعلان في طلب واحد */
+  /* جلب التفاصيل + الممثلين + المشابه + الإعلان بلغة الواجهة */
   useEffect(() => {
     let alive = true;
     setDetails(null);
-    tmdb(`/${type}/${item.id}`, { append_to_response: "credits,recommendations,similar,videos" })
+    tmdb(`/${type}/${item.id}`, { append_to_response: "credits,recommendations,similar,videos", language: localeConfig[locale].apiLanguage })
       .then(d => { if (alive) setDetails(d); })
       .catch(() => {});
     return () => { alive = false; };
-  }, [item.id, type]);
+  }, [item.id, type, locale]);
 
   /* تصفير الواجهة عند فتح عمل آخر من «أعمال مشابهة» */
   useEffect(() => {
@@ -216,17 +219,17 @@ export function DetailsModal({
   useEffect(() => {
     if (type !== "tv" || !details) return;
     setLoadingEps(true);
-    tmdb(`/tv/${item.id}/season/${season}`)
+    tmdb(`/tv/${item.id}/season/${season}`, { language: localeConfig[locale].apiLanguage })
       .then(d => setSeasonEps(d.episodes || []))
       .catch(() => setSeasonEps([]))
       .finally(() => setLoadingEps(false));
-  }, [type, item.id, season, details]);
+  }, [type, item.id, season, details, locale]);
 
-  const title    = item.title || item.name || details?.title || details?.name || "بلا عنوان";
+  const title    = item.title || item.name || details?.title || details?.name || t.media.noTitle;
   const year     = (item.release_date || item.first_air_date
     || details?.release_date || details?.first_air_date || "").slice(0, 4);
   const rating   = details?.vote_average ?? item.vote_average;
-  const genreMap = type === "tv" ? GENRES_TV : GENRES_MOVIE;
+  const genreMap = genresFor(type, locale);
   const genres: string[] = details?.genres?.map((g: any) => g.name)
     || (item.genre_ids || []).map(id => genreMap[id]).filter(Boolean);
   const isFav   = favSet.has(`${type}-${item.id}`);
@@ -274,6 +277,9 @@ export function DetailsModal({
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  /* زر الرجوع في شريط المشغّل — يعكس الاتجاه حسب اللغة */
+  const BackIcon = locale === "en" ? ArrowLeft : ArrowRight;
+
   /* ── صف حلقة واحدة (يُستخدم في الشريط الجانبي وفي الموبايل) ── */
   const EpisodeRow = ({ ep, onPick }: { ep: Episode; onPick?: (n: number) => void }) => {
     const active = episode === ep.episode_number;
@@ -282,7 +288,7 @@ export function DetailsModal({
         onClick={() => (onPick ?? selectEpisode)(ep.episode_number)}
         className={`group flex w-full items-start gap-3 border-b border-white/5
           p-2.5 text-right transition last:border-0 hover:bg-white/5
-          ${active ? "bg-amber-400/5 border-r-2 border-r-amber-400" : ""}`}>
+          ${active ? "bg-amber-400/5 border-s-2 border-s-amber-400" : ""}`}>
         {/* صورة الحلقة */}
         <div className="relative w-24 flex-shrink-0 md:w-28">
           <div className="aspect-video overflow-hidden rounded-lg bg-[#1c1c22]">
@@ -309,11 +315,11 @@ export function DetailsModal({
         </div>
         {/* نص الحلقة */}
         <div className="min-w-0 flex-1 py-0.5">
-          <p className="line-clamp-1 text-[12px] font-bold text-white md:text-[13px]">
+          <p dir="auto" className="line-clamp-1 text-[12px] font-bold text-white md:text-[13px]">
             {ep.name}
           </p>
           <p className="mt-0.5 text-[10px] text-zinc-500">
-            {ep.air_date || "—"}{ep.runtime ? ` · ${ep.runtime} د` : ""}
+            {ep.air_date || "—"}{ep.runtime ? ` · ${ep.runtime} ${t.player.minutesShort}` : ""}
           </p>
         </div>
       </button>
@@ -333,7 +339,7 @@ export function DetailsModal({
                 ${season === s
                   ? "bg-amber-400 text-black"
                   : "bg-[#1c1c22] text-zinc-300 ring-1 ring-white/10 hover:ring-white/40"}`}>
-              الموسم {s}
+              {t.player.season} {s}
             </button>
           ))}
         </div>
@@ -345,7 +351,7 @@ export function DetailsModal({
             <Loader2 className="animate-spin text-amber-400" />
           </div>
         ) : seasonEps.length === 0 ? (
-          <p className="py-10 text-center text-xs text-zinc-500">لا توجد حلقات</p>
+          <p className="py-10 text-center text-xs text-zinc-500">{t.anime.noEpisodes}</p>
         ) : (
           seasonEps.map(ep => <EpisodeRow key={ep.id} ep={ep} onPick={onPick} />)
         )}
@@ -380,7 +386,7 @@ export function DetailsModal({
               <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/35 to-black/25" />
               {/* زر الإغلاق */}
               <button onClick={onClose}
-                className="absolute left-3 top-3 flex h-9 w-9 items-center justify-center
+                className="absolute end-3 top-3 flex h-9 w-9 items-center justify-center
                   rounded-full bg-black/60 text-white transition hover:bg-white hover:text-black">
                 <X size={18} />
               </button>
@@ -422,17 +428,17 @@ export function DetailsModal({
                     <Rating value={rating} size="md" />
                     {year && <span className="font-bold text-zinc-300">{year}</span>}
                     <span className="text-zinc-600">·</span>
-                    <span>{type === "tv" ? "مسلسل" : "فيلم"}</span>
+                    <span>{type === "tv" ? t.media.show : t.media.movie}</span>
                     {type === "movie" && !!details?.runtime && (
                       <>
                         <span className="text-zinc-600">·</span>
-                        <span>{details.runtime} دقيقة</span>
+                        <span>{details.runtime} {t.player.minutes}</span>
                       </>
                     )}
                     {type === "tv" && details && (
                       <>
                         <span className="text-zinc-600">·</span>
-                        <span>{seasons} {seasons > 1 ? "مواسم" : "موسم"}</span>
+                        <span>{seasons} {seasons > 1 ? t.player.seasons : t.player.season}</span>
                       </>
                     )}
                     <MetaBadge>HD</MetaBadge>
@@ -460,7 +466,7 @@ export function DetailsModal({
                     text-sm font-black text-black shadow-xl shadow-amber-400/20
                     transition hover:bg-amber-300">
                   <Play size={16} className="fill-black" />
-                  تشغيل الآن
+                  {t.player.playNow}
                 </button>
 
                 {trailer && (
@@ -469,35 +475,35 @@ export function DetailsModal({
                       text-sm font-bold text-white ring-1 ring-white/15 backdrop-blur
                       transition hover:bg-white/20">
                     <Clapperboard size={16} />
-                    الإعلان
+                    {t.player.trailer}
                   </button>
                 )}
 
                 <FavBtn active={isFav} onToggle={() => toggleFav(item, type)} size={46} />
 
-                <button onClick={share} title="مشاركة"
+                <button onClick={share} title={t.player.share}
                   className="flex h-[46px] w-[46px] items-center justify-center rounded-full
                     bg-white/5 text-zinc-300 ring-1 ring-white/15 backdrop-blur
                     transition hover:bg-white/15 hover:text-white">
                   <Share2 size={18} />
                 </button>
                 {copied && (
-                  <span className="text-[11px] font-bold text-emerald-400">تم نسخ الرابط ✓</span>
+                  <span className="text-[11px] font-bold text-emerald-400">{t.player.copied}</span>
                 )}
               </div>
 
               {/* القصة */}
               <section className="mt-7">
-                <SectionTitle icon={<BookOpen size={16} />}>القصة</SectionTitle>
+                <SectionTitle icon={<BookOpen size={16} />}>{t.player.story}</SectionTitle>
                 <p dir="auto" className="text-[13px] leading-7 text-zinc-300">
-                  {item.overview || details?.overview || "لا يوجد وصف متوفر لهذا العمل."}
+                  {item.overview || details?.overview || t.player.noDescription}
                 </p>
               </section>
 
               {/* طاقم العمل */}
               {!!cast.length && (
                 <section className="mt-7">
-                  <SectionTitle icon={<Users size={16} />}>طاقم العمل</SectionTitle>
+                  <SectionTitle icon={<Users size={16} />}>{t.player.cast}</SectionTitle>
                   <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-2
                     [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1">
                     {cast.map(c => (
@@ -515,7 +521,7 @@ export function DetailsModal({
                         )}
                         <p className="line-clamp-1 w-full text-[11px] font-bold text-zinc-200">{c.name}</p>
                         {c.character && (
-                          <p className="line-clamp-1 w-full text-[10px] text-zinc-500">{c.character}</p>
+                          <p dir="auto" className="line-clamp-1 w-full text-[10px] text-zinc-500">{c.character}</p>
                         )}
                       </div>
                     ))}
@@ -526,7 +532,7 @@ export function DetailsModal({
               {/* الحلقات (للمسلسلات) */}
               {type === "tv" && (
                 <section className="mt-7">
-                  <SectionTitle icon={<ListVideo size={16} />}>الحلقات</SectionTitle>
+                  <SectionTitle icon={<ListVideo size={16} />}>{t.anime.episodes}</SectionTitle>
                   <EpisodesBlock onPick={n => { setEpisode(n); setMode("player"); }} />
                 </section>
               )}
@@ -534,7 +540,7 @@ export function DetailsModal({
               {/* أعمال مشابهة */}
               {!!similar.length && onSelect && (
                 <section className="mt-7">
-                  <SectionTitle icon={<Clapperboard size={16} />}>أعمال مشابهة</SectionTitle>
+                  <SectionTitle icon={<Clapperboard size={16} />}>{t.player.similar}</SectionTitle>
                   <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2
                     [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {similar.map(sim => (
@@ -553,19 +559,19 @@ export function DetailsModal({
         {/* ── شريط علوي: العنوان + الإغلاق/المفضلة ── */}
         <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-white/5 px-4 py-3 md:px-5">
           <div className="min-w-0 flex-1">
-            <span className="text-[10px] font-bold text-amber-400">{type === "tv" ? "مسلسل" : "فيلم"}</span>
+            <span className="text-[10px] font-bold text-amber-400">{type === "tv" ? t.media.show : t.media.movie}</span>
             <div className="flex items-center gap-2">
               <h1 className="truncate text-lg font-extrabold text-white md:text-xl">{title}</h1>
               {type === "tv" && (
-                <span className="flex-shrink-0 text-sm font-bold text-amber-400">· م{season} ح{episode}</span>
+                <span className="flex-shrink-0 text-sm font-bold text-amber-400">· {t.player.seasonShort}{season} {t.player.episodeShort}{episode}</span>
               )}
             </div>
           </div>
           <div className="flex flex-shrink-0 items-center gap-2">
-            <button onClick={() => setMode("info")} title="رجوع للتفاصيل"
+            <button onClick={() => setMode("info")} title={t.player.backToDetails}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-zinc-300
                 transition hover:bg-white hover:text-black">
-              <ArrowRight size={18} />
+              <BackIcon size={18} />
             </button>
             <FavBtn active={isFav} onToggle={() => toggleFav(item, type)} size={40} />
             <button onClick={onClose}
@@ -586,15 +592,15 @@ export function DetailsModal({
                 <div className="flex items-center justify-between">
                   <button onClick={() => setMode("player")}
                     className="flex items-center gap-1.5 text-sm font-bold text-zinc-300 transition hover:text-amber-400">
-                    <ArrowRight size={16} /> رجوع للمشغّل
+                    <BackIcon size={16} /> {t.player.backToPlayer}
                   </button>
-                  <span className="line-clamp-1 text-sm font-bold text-white">الإعلان الرسمي</span>
+                  <span className="line-clamp-1 text-sm font-bold text-white">{t.player.officialTrailer}</span>
                 </div>
                 <div className="relative w-full overflow-hidden rounded-xl bg-black ring-1 ring-white/10"
                   style={{ aspectRatio: "16 / 9" }}>
                   <iframe
                     src={`https://www.youtube-nocookie.com/embed/${trailer.key}?autoplay=1&rel=0`}
-                    title={`إعلان ${title}`}
+                    title={`${t.player.trailer} ${title}`}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                     className="absolute inset-0 h-full w-full"
@@ -606,10 +612,10 @@ export function DetailsModal({
             )}
           </div>
 
-          {/* عمودان: التفاصيل يميناً / الحلقات يساراً (مرآة RTL) — الأفلام عمود واحد */}
+          {/* عمودان: التفاصيل + الحلقات — الأفلام عمود واحد */}
           <div className={`grid gap-5 p-3 md:gap-6 md:p-5 ${type === "tv" ? "lg:grid-cols-[1fr_340px]" : ""}`}>
 
-            {/* ── العمود الأيسر: التفاصيل ── */}
+            {/* ── العمود الأول: التفاصيل ── */}
             <div className="space-y-5">
               {details?.tagline && (
                 <p dir="auto" className="line-clamp-1 text-xs text-zinc-500">
@@ -622,17 +628,17 @@ export function DetailsModal({
                 <Rating value={rating} size="md" />
                 {year && <span className="font-bold text-zinc-300">{year}</span>}
                 <span className="text-zinc-600">·</span>
-                <span>{type === "tv" ? "مسلسل" : "فيلم"}</span>
+                <span>{type === "tv" ? t.media.show : t.media.movie}</span>
                 {type === "movie" && !!details?.runtime && (
                   <>
                     <span className="text-zinc-600">·</span>
-                    <span>{details.runtime} دقيقة</span>
+                    <span>{details.runtime} {t.player.minutes}</span>
                   </>
                 )}
                 {type === "tv" && details && (
                   <>
                     <span className="text-zinc-600">·</span>
-                    <span>{seasons} {seasons > 1 ? "مواسم" : "موسم"}</span>
+                    <span>{seasons} {seasons > 1 ? t.player.seasons : t.player.season}</span>
                   </>
                 )}
                 <MetaBadge>HD</MetaBadge>
@@ -658,18 +664,18 @@ export function DetailsModal({
                       text-sm font-bold text-white ring-1 ring-white/15 backdrop-blur
                       transition hover:bg-white/20">
                     <Clapperboard size={16} />
-                    {mode === "trailer" ? "رجوع للمشغّل" : "الإعلان"}
+                    {mode === "trailer" ? t.player.backToPlayer : t.player.trailer}
                   </button>
                 )}
 
-                <button onClick={share} title="مشاركة"
+                <button onClick={share} title={t.player.share}
                   className="flex h-[46px] w-[46px] items-center justify-center rounded-full
                     bg-white/5 text-zinc-300 ring-1 ring-white/15 backdrop-blur
                     transition hover:bg-white/15 hover:text-white">
                   <Share2 size={18} />
                 </button>
                 {copied && (
-                  <span className="text-[11px] font-bold text-emerald-400">تم نسخ الرابط ✓</span>
+                  <span className="text-[11px] font-bold text-emerald-400">{t.player.copied}</span>
                 )}
               </div>
 
@@ -681,33 +687,33 @@ export function DetailsModal({
                     onClick={() => selectEpisode(episode - 1)}
                     className="rounded-lg bg-zinc-800 px-3 py-1.5 text-xs font-bold text-zinc-300
                       transition hover:text-amber-400 disabled:opacity-30">
-                    ← السابقة
+                    {`← ${t.anime.previous}`}
                   </button>
                   <span className="text-xs text-zinc-400">
-                    الموسم {season} · الحلقة {episode}
+                    {t.player.season} {season} · {t.anime.episode} {episode}
                   </span>
                   <button
                     disabled={!seasonEps.length || episode >= seasonEps.length}
                     onClick={() => selectEpisode(episode + 1)}
                     className="rounded-full bg-amber-400 px-4 py-1.5 text-xs font-black text-black
                       transition hover:bg-amber-300 disabled:opacity-30">
-                    التالية →
+                    {`${t.anime.next} →`}
                   </button>
                 </div>
               )}
 
               {/* القصة */}
               <section>
-                <SectionTitle icon={<BookOpen size={16} />}>القصة</SectionTitle>
+                <SectionTitle icon={<BookOpen size={16} />}>{t.player.story}</SectionTitle>
                 <p dir="auto" className="text-[13px] leading-7 text-zinc-300">
-                  {item.overview || details?.overview || "لا يوجد وصف متوفر لهذا العمل."}
+                  {item.overview || details?.overview || t.player.noDescription}
                 </p>
               </section>
 
               {/* طاقم العمل */}
               {!!cast.length && (
                 <section>
-                  <SectionTitle icon={<Users size={16} />}>طاقم العمل</SectionTitle>
+                  <SectionTitle icon={<Users size={16} />}>{t.player.cast}</SectionTitle>
                   <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-2
                     [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1">
                     {cast.map(c => (
@@ -725,7 +731,7 @@ export function DetailsModal({
                         )}
                         <p className="line-clamp-1 w-full text-[11px] font-bold text-zinc-200">{c.name}</p>
                         {c.character && (
-                          <p className="line-clamp-1 w-full text-[10px] text-zinc-500">{c.character}</p>
+                          <p dir="auto" className="line-clamp-1 w-full text-[10px] text-zinc-500">{c.character}</p>
                         )}
                       </div>
                     ))}
@@ -736,16 +742,16 @@ export function DetailsModal({
               {/* الحلقات (موبايل) */}
               {type === "tv" && (
                 <div className="lg:hidden">
-                  <SectionTitle icon={<ListVideo size={16} />}>الحلقات</SectionTitle>
+                  <SectionTitle icon={<ListVideo size={16} />}>{t.anime.episodes}</SectionTitle>
                   <EpisodesBlock />
                 </div>
               )}
             </div>
 
-            {/* ── العمود الأيمن: الحلقات (سطح المكتب) ── */}
+            {/* ── العمود الثاني: الحلقات (سطح المكتب) ── */}
             {type === "tv" && (
               <aside className="hidden lg:block">
-                <SectionTitle icon={<ListVideo size={16} />}>الحلقات</SectionTitle>
+                <SectionTitle icon={<ListVideo size={16} />}>{t.anime.episodes}</SectionTitle>
                 <EpisodesBlock />
               </aside>
             )}
@@ -754,7 +760,7 @@ export function DetailsModal({
           {/* أعمال مشابهة — بعرض كامل أسفل الشبكة */}
           {!!similar.length && onSelect && (
             <section className="px-3 pb-6 md:px-5">
-              <SectionTitle icon={<Clapperboard size={16} />}>أعمال مشابهة</SectionTitle>
+              <SectionTitle icon={<Clapperboard size={16} />}>{t.player.similar}</SectionTitle>
               <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2
                 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {similar.map(sim => (
