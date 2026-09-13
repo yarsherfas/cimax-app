@@ -86,8 +86,8 @@ export function buildEmbedUrl(
     case "xullys":
     default:
       return m
-        ? `https://nextbox.uno/player/movie/${id}`
-        : `https://nextbox.uno/player/tv/${id}/${season}/${episode}`;
+        ? `https://primeflix.ru/player/movie/${id}`
+        : `https://primeflix.ru/player/tv/${id}/${season}/${episode}`;
   }
 }
 
