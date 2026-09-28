@@ -77,8 +77,8 @@ export function buildEmbedUrl(
         : `/watch/tv/${id}/${season}/${episode}`;
     case "nextbox":
       return m
-        ? `https://nextbox.uno/player/movie/${id}`
-        : `https://nextbox.uno/player/tv/${id}/${season}/${episode}`;
+        ? `https://cinesrc.st/embed/movie/${id}`
+        : `https://cinesrc.st/embed/tv/${id}?s=${season}&e=${episode}`;
     case "moviebite":
       return m
         ? `https://moviebite.org/watch/movie/${id}/`
