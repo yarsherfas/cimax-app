@@ -54,8 +54,8 @@ export function buildEmbedUrl(
         : `https://vidfast.vc/tv/${id}/${season}/${episode}?autoPlay=true`;
     case "vidking":
       return m
-        ? `https://www.vidking.net/embed/movie/${id}?${VIDKING_PARAMS}`
-        : `https://www.vidking.net/embed/tv/${id}/${season}/${episode}?${VIDKING_TV_PARAMS}`;
+        ? `https://atlantic.st/watch/${id}`
+        : `https://atlantic.st/watch/${id}/${season}/${episode}`;
     case "vidsrcru":
       return m
         ? `https://vidsrc-embed.ru/embed/movie?tmdb=${id}&ds_lang=${lang}`
@@ -81,8 +81,8 @@ export function buildEmbedUrl(
         : `https://cinesrc.st/embed/tv/${id}?s=${season}&e=${episode}`;
     case "moviebite":
       return m
-        ? `https://moviebite.org/watch/movie/${id}/`
-        : `https://moviebite.org/watch/tv/${id}/season/${season}/episode/${episode}/`;
+        ? `https://moviebite.org/watch/movie/${id}`
+        : `https://moviebite.org/watch/tv/${id}/season/${season}/episode/${episode}`;
     case "xullys":
     default:
       return m
