@@ -6,6 +6,9 @@ import {
   ANIME_LANGS, buildAnimeEmbedUrl, buildEpisodeList,
   fetchAnimeByMal, fetchAnimeSeries,
 } from "@/lib/anime";
+import {
+  AniPmEpisode, buildAniPmEmbedUrl, fetchAniPmSeries,
+} from "@/lib/anipm";
 import { FavBtn } from "./ui";
 import { EmbedPlayer } from "./EmbedPlayer";
 import { useLanguage } from "./LanguageProvider";
@@ -26,29 +29,64 @@ export function AnimeModal({
   const [reloadKey, setReloadKey]   = useState(0);
   const [loadingEps, setLoadingEps] = useState(true);
 
+  // ani.pm availability — primary player; MegaPlay stays as fallback
+  const [aniPmEpisodes, setAniPmEpisodes] = useState<AniPmEpisode[] | null>(null);
+  const [aniPmReady, setAniPmReady]       = useState(false);
+  const [forceFallback, setForceFallback] = useState(false);
+
   const isFav = favSet.has(`anime-${item.mal_id}`);
-  const episodeCount = details.episodes || episodes.length || 12;
-  const episodeList = buildEpisodeList(episodeCount, episodes);
+
+  /* Episode count & list: prefer ani.pm catalogue when available, else Anikoto */
+  const episodeCount = aniPmEpisodes && aniPmEpisodes.length > 0 && !forceFallback
+    ? aniPmEpisodes.length
+    : (details.episodes || episodes.length || 12);
+
+  const episodeList = aniPmEpisodes && aniPmEpisodes.length > 0 && !forceFallback
+    ? aniPmEpisodes.map(ep => ({ number: ep.number, title: ep.title ?? undefined } as AnimeEpisode))
+    : buildEpisodeList(episodeCount, episodes);
+
   const genres = (details.genres || []).join(" · ");
 
   const epData = episodes.find(e => e.number === episode);
   const embedId = epData?.embed_id;
-  const url = buildAnimeEmbedUrl(item.mal_id, episode, lang, embedId);
+
+  // Per-episode ani.pm availability (sub/dub)
+  const aniPmEpAvail = aniPmEpisodes?.find(e => e.number === episode)?.available ?? null;
+  const canUseAniPm = !!aniPmEpisodes && aniPmEpisodes.length > 0 && !forceFallback;
+
+  const url = canUseAniPm
+    ? buildAniPmEmbedUrl({
+        anilistId: details.ani_id,
+        malId: details.mal_id,
+        episode,
+        lang,
+        color: "7c3aed",
+        autonext: 1,
+      })
+    : buildAnimeEmbedUrl(item.mal_id, episode, lang, embedId);
 
   const langs = useMemo(
     () => ANIME_LANGS.filter(l => {
+      // When ani.pm is the active source, filter by its per-episode availability
+      if (canUseAniPm && aniPmEpAvail) {
+        if (l.id === "sub" && !aniPmEpAvail.sub) return false;
+        if (l.id === "dub" && !aniPmEpAvail.dub) return false;
+        return true;
+      }
       if (l.id === "dub" && details.is_dub === 0) return false;
       if (epData?.has_sub === false && l.id === "sub") return false;
       if (epData?.has_dub === false && l.id === "dub") return false;
       return true;
     }),
-    [details.is_dub, epData?.has_sub, epData?.has_dub],
+    [canUseAniPm, aniPmEpAvail, details.is_dub, epData?.has_sub, epData?.has_dub],
   );
 
-  /* تحميل تفاصيل المسلسل + الحلقات + بيانات MAL */
+  /* تحميل تفاصيل المسلسل + الحلقات + بيانات MAL + توفّر ani.pm (المصدر الأساسي) */
   useEffect(() => {
     let alive = true;
     setLoadingEps(true);
+    setAniPmReady(false);
+    setForceFallback(false);
 
     (async () => {
       const [series, malInfo] = await Promise.all([
@@ -64,34 +102,67 @@ export function AnimeModal({
       if (series.episodes.length > 0) {
         setEpisodes(series.episodes);
       }
+      const mergedAniId = (series.anime as AnimeItem | null)?.ani_id ?? item.ani_id;
+      const mergedMalId = item.mal_id;
       if (malInfo.episodes) {
         setDetails(prev => ({ ...prev, ...malInfo, episodes: malInfo.episodes ?? prev.episodes }));
       }
       setLoadingEps(false);
+
+      // Check ani.pm catalogue — prefer AniList id, fall back to MAL
+      const by = mergedAniId ? "ani" as const : "mal" as const;
+      const lookupId = mergedAniId ?? mergedMalId;
+      try {
+        const anipm = await fetchAniPmSeries(lookupId, by);
+        if (!alive) return;
+        if (anipm && anipm.episodeList.length > 0) {
+          setAniPmEpisodes(anipm.episodeList);
+          // Enrich ani_id if we learned it from ani.pm
+          if (anipm.anilistId && !mergedAniId) {
+            setDetails(prev => ({ ...prev, ani_id: anipm.anilistId }));
+          }
+        } else {
+          setAniPmEpisodes(null);
+        }
+      } catch {
+        if (alive) setAniPmEpisodes(null);
+      } finally {
+        if (alive) setAniPmReady(true);
+      }
     })();
 
     return () => { alive = false; };
   }, [item.id, item.mal_id, locale]);
 
-  /* إعادة تحميل المشغّل عند تغيّر اللغة/الحلقة */
+  /* إعادة تحميل المشغّل عند تغيّر اللغة/الحلقة/المصدر */
   useEffect(() => {
     setReloadKey(k => k + 1);
-  }, [lang, episode, embedId]);
+  }, [lang, episode, embedId, canUseAniPm]);
 
   /* إن أصبحت اللغة الحالية غير متاحة للحلقة، عُد إلى المترجمة */
   useEffect(() => {
     if (langs.length > 0 && !langs.some(l => l.id === lang)) setLang("sub");
   }, [langs, lang]);
 
-  /* MegaPlay يُعلن انتهاء الحلقة عبر postMessage — انتقل للتالية تلقائياً */
+  /* انتهاء الحلقة عبر postMessage (ani.pm + MegaPlay) — انتقل للتالية تلقائياً */
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      if (!event.origin.includes("megaplay.buzz")) return;
+      const origin = event.origin;
+      const isAniPm = origin === "https://ani.pm";
+      const isMega = origin.includes("megaplay.buzz");
+      if (!isAniPm && !isMega) return;
+
       let data = event.data;
       if (typeof data === "string") {
         try { data = JSON.parse(data); } catch { return; }
       }
-      if (data?.event === "complete" && episode < episodeCount) {
+
+      const isComplete =
+        data?.event === "complete" ||
+        (data?.channel === "megacloud" && data?.event === "complete") ||
+        (data?.ns === "anipm.player" && data?.event === "ended");
+
+      if (isComplete && episode < episodeCount) {
         setEpisode(e => Math.min(e + 1, episodeCount));
       }
     };
@@ -137,12 +208,36 @@ export function AnimeModal({
         {/* ── جسم قابل للتمرير ── */}
         <div className="flex-1 overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1">
 
-          {/* المشغّل أعلى الصفحة */}
+          {/* المشغّل أعلى الصفحة — ani.pm أساسي، MegaPlay احتياطي */}
           <div className="px-3 pt-3 md:px-5 md:pt-5">
+            {/* Provider badge + fallback toggle */}
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-2.5 py-1 text-[11px] font-bold ring-1 ring-white/10">
+                <span className={`h-2 w-2 rounded-full ${canUseAniPm ? "bg-violet-400" : "bg-zinc-500"}`} />
+                <span className={canUseAniPm ? "text-violet-300" : "text-zinc-400"}>
+                  {canUseAniPm ? t.anime.providerAnipm : t.anime.providerFallback}
+                </span>
+                {!aniPmReady && <span className="text-zinc-500">· {t.anime.checkingProvider}</span>}
+                {canUseAniPm && aniPmEpAvail && !aniPmEpAvail[lang] && (
+                  <span className="text-amber-300">· {t.anime.fallbackNotice}</span>
+                )}
+              </span>
+
+              {aniPmEpisodes && aniPmEpisodes.length > 0 && (
+                <button
+                  onClick={() => setForceFallback(v => !v)}
+                  className="rounded-full border border-white/10 bg-zinc-900 px-3 py-1 text-[11px] font-bold text-zinc-300
+                    hover:border-white/20 hover:text-white transition"
+                >
+                  {forceFallback ? t.anime.switchToAnipm : t.anime.switchToFallback}
+                </button>
+              )}
+            </div>
+
             <EmbedPlayer
               src={url}
               title={`${details.title} — ${t.player.episodeShort}${episode}`}
-              reloadKey={`${reloadKey}-${lang}-${episode}`}
+              reloadKey={`${reloadKey}-${canUseAniPm ? "anipm" : "mega"}-${lang}-${episode}`}
               accent="violet"
               blockPopups={false}
               aspect
