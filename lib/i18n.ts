@@ -63,6 +63,12 @@ export type Messages = {
     subbed: string;
     dubbed: string;
     episodesCount: (count: number) => string;
+    providerAnipm: string;
+    providerFallback: string;
+    fallbackNotice: string;
+    switchToFallback: string;
+    switchToAnipm: string;
+    checkingProvider: string;
   };
   player: {
     playNow: string;
@@ -153,7 +159,7 @@ export const messages: Record<Locale, Messages> = {
     },
     anime: {
       title: "أنيمي",
-      subtitle: "مشغّل MegaPlay — مترجم ومدبلج",
+      subtitle: "مشغّل ani.pm — مترجم ومدبلج",
       unavailable: "لا يوجد أنيمي متاح حالياً",
       episodes: "الحلقات",
       episode: "الحلقة",
@@ -166,6 +172,12 @@ export const messages: Record<Locale, Messages> = {
       subbed: "مترجم",
       dubbed: "مدبلج",
       episodesCount: n => `${n} حلقة`,
+      providerAnipm: "ani.pm",
+      providerFallback: "بديل",
+      fallbackNotice: "غير متوفر على ani.pm — يُعرض البديل",
+      switchToFallback: "جرّب المشغّل البديل",
+      switchToAnipm: "العودة إلى ani.pm",
+      checkingProvider: "جاري التحقّق من المصدر…",
     },
     player: {
       playNow: "تشغيل الآن",
@@ -254,7 +266,7 @@ export const messages: Record<Locale, Messages> = {
     },
     anime: {
       title: "Anime",
-      subtitle: "MegaPlay player — subbed & dubbed",
+      subtitle: "ani.pm player — subbed & dubbed",
       unavailable: "No anime available right now",
       episodes: "Episodes",
       episode: "Episode",
@@ -267,6 +279,12 @@ export const messages: Record<Locale, Messages> = {
       subbed: "Subbed",
       dubbed: "Dubbed",
       episodesCount: n => `${n} episodes`,
+      providerAnipm: "ani.pm",
+      providerFallback: "Fallback",
+      fallbackNotice: "Not on ani.pm — showing fallback",
+      switchToFallback: "Try fallback player",
+      switchToAnipm: "Back to ani.pm",
+      checkingProvider: "Checking source…",
     },
     player: {
       playNow: "Play now",

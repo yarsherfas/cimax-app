@@ -18,6 +18,10 @@ import { useLanguage } from "@/components/LanguageProvider";
 
 type Page = "home" | "movies" | "shows" | "animes" | "favorites";
 
+/* مفاتيح حفظ المفضلة في المتصفح (تبقى بعد التحديث/الإغلاق) */
+const FAV_KEY = "cimax:favorites";
+const ANIME_FAV_KEY = "cimax:anime-favorites";
+
 export default function CimaxPage() {
   const { locale, t } = useLanguage();
 
@@ -83,6 +87,33 @@ export default function CimaxPage() {
       return next;
     });
   }, []);
+
+  // تحميل المفضلة المحفوظة عند فتح الموقع
+  useEffect(() => {
+    try {
+      const rawFav = localStorage.getItem(FAV_KEY);
+      if (rawFav) {
+        const items: MediaItem[] = JSON.parse(rawFav);
+        setFavorites(new Map(items.map(i => [`${i.media_type}-${i.id}`, i])));
+      }
+    } catch {}
+    try {
+      const rawAnime = localStorage.getItem(ANIME_FAV_KEY);
+      if (rawAnime) {
+        const items: AnimeItem[] = JSON.parse(rawAnime);
+        setAnimeFavorites(new Map(items.map(i => [i.mal_id, i])));
+      }
+    } catch {}
+  }, []);
+
+  // حفظ المفضلة عند كل تغيير
+  useEffect(() => {
+    try { localStorage.setItem(FAV_KEY, JSON.stringify(Array.from(favorites.values()))); } catch {}
+  }, [favorites]);
+
+  useEffect(() => {
+    try { localStorage.setItem(ANIME_FAV_KEY, JSON.stringify(Array.from(animeFavorites.values()))); } catch {}
+  }, [animeFavorites]);
 
   /* ── تصفح الأفلام/المسلسلات بالفئات ── */
   const catType: MediaType = page === "shows" ? "tv" : "movie";
